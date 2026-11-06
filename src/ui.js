@@ -1,27 +1,38 @@
 import { TITLE, VERSION, AUTHOR } from './const.js';
+import faceUrl from './img/face.webp';
+import pistolUrl from './img/pistol.webp';
 
 const CSS = `
 #ui{position:fixed;inset:0;pointer-events:none;font-family:"Microsoft JhengHei","微軟正黑體","PingFang TC","Noto Sans TC",sans-serif;color:#f3ead4}
 #ui *{box-sizing:border-box}
 .gold{color:#e8c25a}
 .sig{font-style:italic;color:#d9ae3c;letter-spacing:.06em;text-shadow:0 1px 3px #000}
-.hud{position:absolute;left:0;right:0;bottom:0;height:clamp(96px,15vh,170px);display:flex;align-items:stretch;gap:0;
-  background:linear-gradient(180deg,rgba(24,20,18,.0) 0,rgba(20,16,14,.82) 22%,rgba(14,11,10,.96) 100%);border-top:2px solid rgba(214,170,70,.55);padding:0 2vw}
-.hud:before{content:"";position:absolute;left:0;right:0;top:-2px;height:2px;background:linear-gradient(90deg,transparent,#e8c25a,transparent)}
+.hud{position:absolute;left:0;right:0;bottom:0;height:clamp(104px,16vh,180px);display:flex;align-items:stretch;padding:0 2.2vw;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 100' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23241d18'/%3E%3Cstop offset='1' stop-color='%230b0807'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpolygon points='0,100 0,28 22,4 978,4 1000,28 1000,100' fill='url(%23g)' stroke='%23e8b84a' stroke-width='3' vector-effect='non-scaling-stroke'/%3E%3Cpolyline points='8,100 8,32 26,11 974,11 992,32 992,100' fill='none' stroke='%23a67a22' stroke-opacity='.55' stroke-width='1.5' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") center/100% 100% no-repeat;
+  filter:drop-shadow(0 -6px 14px rgba(255,170,60,.28))}
+.hud:before{display:none}
 .blk{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:0 clamp(10px,1.8vw,30px);min-width:0;position:relative}
 .blk+.blk:before{content:"";position:absolute;left:0;top:18%;bottom:18%;width:1px;background:linear-gradient(180deg,transparent,rgba(214,170,70,.5),transparent)}
 .lab{font-size:clamp(14px,2.1vh,24px);color:#c9b27a;letter-spacing:.2em;margin-bottom:.2vh}
-.val{font-size:clamp(34px,6.4vh,74px);font-weight:700;line-height:1;font-variant-numeric:tabular-nums;text-shadow:0 2px 6px #000;min-width:2.2ch;text-align:center}
+.val{white-space:nowrap;font-size:clamp(34px,6.4vh,74px);font-weight:700;line-height:1;font-variant-numeric:tabular-nums;text-shadow:0 2px 6px #000;min-width:2.2ch;text-align:center}
 .val.sm{font-size:clamp(26px,4.4vh,52px)}
 .val.low{color:#ff5a4a;animation:pulse .8s infinite}
 @keyframes pulse{50%{opacity:.55}}
-#face{width:clamp(84px,13vh,150px);height:clamp(84px,13vh,150px);align-self:center;border:2px solid #b88f35;border-radius:6px;background:#201a15;box-shadow:inset 0 0 12px #000,0 0 14px rgba(0,0,0,.6)}
+#face{height:clamp(96px,15vh,170px);width:auto;align-self:center;margin-top:-1.2vh;filter:drop-shadow(0 0 10px rgba(255,170,50,.55));transition:filter .25s}
+#face.hurt{filter:drop-shadow(0 0 12px #f00) sepia(1) saturate(4) hue-rotate(-30deg) brightness(.9)}
+#gun2d{position:absolute;pointer-events:none;height:54vh;aspect-ratio:773/591;left:calc(50% - 17vh);bottom:calc(clamp(104px,16vh,180px) - 11vh);transform-origin:68% 100%;will-change:transform}
+#gun2d img{width:100%;height:100%;display:block;filter:drop-shadow(0 8px 12px rgba(0,0,0,.55))}
+#gun2d .fl{position:absolute;left:-2%;top:-1%;width:26%;aspect-ratio:1;border-radius:50%;opacity:0;background:radial-gradient(circle,#fff 0,#ffe9a0 22%,rgba(255,170,50,.75) 45%,rgba(255,120,20,0) 70%);mix-blend-mode:screen}
+.bar{width:clamp(80px,9vw,150px);height:clamp(7px,1.1vh,13px);border-radius:7px;background:rgba(0,0,0,.65);border:1px solid rgba(255,255,255,.12);margin-top:.5vh;overflow:hidden}
+.bar i{display:block;height:100%;width:100%;transition:width .2s}
+.bar.r i{background:linear-gradient(180deg,#ff6a5a,#c01818)}.bar.b i{background:linear-gradient(180deg,#78b4ff,#2a5fc0)}
+.lab svg{height:1.05em;width:1.05em;vertical-align:-.12em;margin-right:.3em}
 .keys{display:flex;gap:10px;height:clamp(30px,5vh,56px);align-items:center}
 .key{width:clamp(24px,4vh,44px);height:clamp(24px,4vh,44px);opacity:.18;filter:grayscale(1)}
 .key.on{opacity:1;filter:none;filter:drop-shadow(0 0 8px currentColor)}
 .grow{flex:1}
 .side{flex:1;display:flex;align-items:stretch;min-width:0}.side.l{justify-content:flex-end}.side.r{justify-content:flex-start}
-#cross{position:absolute;left:50%;top:50%;width:0;height:0}
+#cross{z-index:6;position:absolute;left:50%;top:50%;width:0;height:0}
 #cross i{position:absolute;background:rgba(255,238,190,.92);box-shadow:0 0 4px #000}
 #cross i:nth-child(1){left:-1px;top:-16px;width:2px;height:8px}#cross i:nth-child(2){left:-1px;top:8px;width:2px;height:8px}
 #cross i:nth-child(3){top:-1px;left:-16px;height:2px;width:8px}#cross i:nth-child(4){top:-1px;left:8px;height:2px;width:8px}
@@ -88,17 +99,18 @@ export function mountUI() {
   <canvas id="mini" width="260" height="260"></canvas>
   <div id="wlist"></div>
   <div id="prompt"></div>
+  <div id="gun2d"><img id="gunimg" src="${pistolUrl}" alt=""><div class="fl" id="gunfl"></div></div>
   <div class="hud" id="hud">
     <div class="side l">
       <div class="blk"><div class="lab" id="lvname">第 1 關</div><div class="val sm" id="kills" style="font-size:clamp(22px,3.6vh,42px)">0/0</div></div>
       <div class="blk"><div class="lab">分數</div><div class="val sm" id="score">0</div></div>
       <div class="blk"><div class="lab">命</div><div class="val sm" id="lives">3</div></div>
     </div>
-    <canvas id="face" width="96" height="96"></canvas>
+    <img id="face" src="${faceUrl}" alt="">
     <div class="side r">
-      <div class="blk"><div class="lab">生命</div><div class="val" id="hp">100</div></div>
-      <div class="blk"><div class="lab">護甲</div><div class="val sm" id="ar">0</div></div>
-      <div class="blk"><div class="lab" id="wname">手槍</div><div class="val" id="ammo">12<span style="font-size:.5em;color:#bba773"> / 40</span></div></div>
+      <div class="blk"><div class="lab"><svg viewBox="0 0 24 24"><path fill="#ff3b3b" d="M12 21s-8-5.2-8-11a4.6 4.6 0 0 1 8-3 4.6 4.6 0 0 1 8 3c0 5.800-8 11-8 11z"/></svg>生命</div><div class="val" id="hp">100</div><div class="bar r"><i id="hpbar"></i></div></div>
+      <div class="blk"><div class="lab"><svg viewBox="0 0 24 24"><path fill="#3d8bff" d="M12 2l8 3v6c0 5-3.500 9-8 11-4.500-2-8-6-8-11V5z"/><path fill="#fff" d="M11 7h2v4h4v2h-4v4h-2v-4H7v-2h4z"/></svg>護甲</div><div class="val sm" id="ar">0</div><div class="bar b"><i id="arbar" style="width:0"></i></div></div>
+      <div class="blk"><div class="lab"><svg viewBox="0 0 24 24"><path fill="#f0b030" d="M12 2c2 2 3 5 3 8v10H9V10c0-3 1-6 3-8z"/><rect x="9" y="17" width="6" height="4" fill="#c88a18"/></svg><span id="wname">手槍</span></div><div class="val" id="ammo">12<span style="font-size:.5em;color:#bba773"> / 40</span></div></div>
       <div class="blk"><div class="lab">鑰匙</div><div class="keys"><svg class="key" id="kg" style="color:#ffd040" viewBox="0 0 32 32"><circle cx="9" cy="16" r="6" fill="none" stroke="#ffd040" stroke-width="3"/><path d="M15 16h15M25 16v6M30 16v4" stroke="#ffd040" stroke-width="3" fill="none"/></svg><svg class="key" id="ks" style="color:#cfe4ff" viewBox="0 0 32 32"><circle cx="9" cy="16" r="6" fill="none" stroke="#cfe4ff" stroke-width="3"/><path d="M15 16h15M25 16v6M30 16v4" stroke="#cfe4ff" stroke-width="3" fill="none"/></svg></div></div>
     </div>
   </div>

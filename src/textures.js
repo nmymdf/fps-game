@@ -596,8 +596,17 @@ export function sprites() {
 const lib = new Map();
 function cached(name, fn) { if (!lib.has(name)) lib.set(name, fn()); return lib.get(name); }
 
+import { photoSet, hasPhoto } from './photo.js';
+const PHOTO = {
+  stoneGrey: ['stone', { }], stoneSand: ['stone', { mul: [1.22, 1.02, 0.78], bright: 1.05 }], stoneBlue: ['stone', { mul: [0.82, 0.94, 1.22] }],
+  roughStone: ['stone', { bright: 0.85 }], cellarStone: ['stone', { bright: 0.62, mul: [1, 0.95, 0.95] }],
+  cellarBrick: ['brick', { }], cellarBrickDark: ['brick', { mul: [0.82, 0.72, 0.72], bright: 0.78 }],
+  floorFlag: ['floorHex', { mul: [0.9, 0.86, 0.9], bright: 0.95 }], floorCobble: ['floorHex', { }], floorFlagDark: ['floorHex', { mul: [0.72, 0.68, 0.76], bright: 0.7 }], floorCobbleDark: ['floorHex', { bright: 0.62 }],
+  door: ['door', { normal: 1.6 }],
+};
 export function getSet(name) {
   return cached(name, () => {
+    const pp = PHOTO[name]; if (pp && hasPhoto(pp[0])) { const s = photoSet(pp[0], pp[1]); if (s) return s; }
     switch (name) {
       case 'stoneGrey': return stoneWall({ seed: 11, rows: 8, cols: 4, base: [132, 130, 136], mortar: [118, 114, 110], moss: 0.4 });
       case 'stoneSand': return stoneWall({ seed: 12, rows: 6, cols: 3, base: [170, 150, 118], mortar: [140, 128, 108], moss: 0 , bevel: 0.02});

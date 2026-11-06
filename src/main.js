@@ -6,10 +6,11 @@ import { Enemies, TYPES } from './enemies.js';
 import { ViewModel, WEAPONS, WEAPON_ORDER } from './weapons.js';
 import { buildItem, TREASURE_SCORE, TREASURE_NAME, ITEM_NAME } from './items.js';
 import { AudioEngine, TRACKS } from './audio.js';
-import { mountUI, drawFace } from './ui.js';
+import { mountUI } from './ui.js';
 import { CELL, EYE, WALL_H, THEMES, VERSION } from './const.js';
 import { flames } from './decor.js';
 import { sprites, getSet, setTexSize } from './textures.js';
+import { loadPhotos } from './photo.js';
 
 // ======================= 基本設定 =======================
 const SAVE = 'castleStrike.v1';
@@ -390,7 +391,7 @@ async function prefetch(theme, label) {
 }
 function showScreen(id) { for (const s of screens) $(s).classList.toggle('on', s === id); setHudVisible(false); }
 function hideScreens() { for (const s of screens) $(s).classList.remove('on'); }
-function setHudVisible(v) { for (const id of ['hud', 'mini', 'wlist', 'cross', 'toasts']) $(id).style.display = v ? '' : 'none'; if (!v) $('prompt').classList.remove('on'); }
+function setHudVisible(v) { for (const id of ['hud', 'mini', 'wlist', 'cross', 'toasts', 'gun2d']) $(id).style.display = v ? '' : 'none'; if (!v) $('prompt').classList.remove('on'); }
 let menuSel = {}, menuItems = {}, menuActive = null;
 function showMenu(id, items) {
   const el = $(id); el.innerHTML = ''; menuItems[id] = items; menuSel[id] = 0; menuActive = id;
@@ -589,7 +590,21 @@ function updateHud(dt) {
   // 臉
   P.lookT -= dt; if (P.lookT <= 0) { P.lookT = 0.8 + Math.random() * 1.8; P.look = [-1, 0, 0, 1][Math.floor(Math.random() * 4)]; }
   if (P.moodT > 0) { P.moodT -= dt; if (P.moodT <= 0 && P.alive) P.mood = 'normal'; }
-  drawFace(ui.face, Math.max(0, P.hp / 100), P.look, P.mood, G.time);
+  const fc = ui.face, hpf = Math.max(0, P.hp / 100);
+  fc.className = P.mood === 'hurt' ? 'hurt' : '';
+  fc.style.filter = P.mood === 'dead' ? 'grayscale(1) brightness(.45)' : P.mood === 'hurt' ? '' : hpf < 0.35 ? `saturate(${0.5 + hpf}) brightness(${0.7 + hpf * 0.5}) drop-shadow(0 0 10px rgba(255,60,40,.6))` : '';
+  $('hpbar').style.width = (hpf * 100) + '%'; $('arbar').style.width = Math.min(100, P.armor) + '%';
+  gun2d();
+}
+const gunEl = () => $('gun2d');
+function gun2d() {
+  const el = gunEl(), a = vm.anim, show = P.cur === 'pistol' && a && P.alive;
+  const vis = show ? '' : 'none'; if (el.style.visibility !== (show ? 'visible' : 'hidden')) el.style.visibility = show ? 'visible' : 'hidden';
+  if (!show) return;
+  const K = innerHeight * 2.3;
+  const x = a.dx * K, y = -a.dy * K + a.k * innerHeight * 0.03, rot = -a.rz * 30 - a.k * 1.6;
+  el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) rotate(${rot.toFixed(2)}deg) scale(${(1 + a.k * 0.02).toFixed(3)})`;
+  $('gunfl').style.opacity = a.flash ? (0.85 + Math.random() * 0.15) : 0;
 }
 let prompt = '';
 function updatePrompt() {
@@ -670,7 +685,7 @@ function frame(now, dtOv) {
 // 啟動
 G.mode = 'loading';
 requestAnimationFrame(frame);
-(async () => { await prefetch('courtyard', '載入中…'); toTitle(); })();
+(async () => { showScreen('s-load'); await loadPhotos(); await prefetch('courtyard', '載入中…'); toTitle(); })();
 
 // 測試／除錯接口
 window.__g = { step: (dt) => frame(performance.now(), dt), G, P, keys, camera, eng, vm, fire, interact, startLevel, newGame, toTitle, pauseGame, switchWeapon, finishLevel, victory, damagePlayer, audio, WEAPONS, TYPES, settings, drawMap };
