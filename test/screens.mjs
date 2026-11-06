@@ -1,0 +1,25 @@
+import { chromium } from 'playwright-core';
+const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl', '--no-sandbox', '--disable-gpu-sandbox', '--allow-file-access-from-files'] });
+const page = await browser.newPage({ viewport: { width: 1280, height: 720 } }); const logs = [];
+page.on('pageerror', (e) => logs.push('PAGEERROR ' + e.message + (e.stack || '').slice(0, 300)));
+await page.goto('file:///home/claude/castle-strike/dist/castle-strike-v1.1.html'); await page.waitForTimeout(2500);
+await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter'); await page.waitForTimeout(500);
+await page.screenshot({ path: '/tmp/s_help.png' });
+await page.keyboard.press('Enter'); await page.waitForTimeout(400);
+await page.keyboard.press('ArrowUp'); await page.keyboard.press('Enter'); await page.waitForTimeout(400); await page.keyboard.press('Enter'); await page.waitForTimeout(4500);
+await page.evaluate(() => { const P = __g.P; P.weapons.smg = true; P.mag.smg = 30; P.cur = 'smg'; __g.vm.show('smg'); P.score = 12500; });
+// 走一小段讓地圖有內容
+await page.evaluate(() => { __g.G.manual = true; __g.G.noRender = true; const P = __g.P; for (let i = 0; i < 100; i++) { P.vx = 0; P.vz = 0; __g.step(0.05); } });
+await page.evaluate(() => { __g.G.manual = false; __g.G.noRender = false; });
+await page.keyboard.press('Tab'); await page.waitForTimeout(800);
+await page.screenshot({ path: '/tmp/s_map.png' });
+await page.keyboard.press('Tab'); await page.waitForTimeout(300);
+await page.evaluate(() => __g.pauseGame()); await page.waitForTimeout(800);
+await page.screenshot({ path: '/tmp/s_pause.png' });
+await page.keyboard.press('Escape'); await page.waitForTimeout(300);
+await page.evaluate(() => { __g.G.kills = 9; __g.G.treasure = 7; __g.finishLevel(); }); await page.waitForTimeout(800);
+await page.screenshot({ path: '/tmp/s_sum.png' });
+await page.keyboard.press('Enter'); await page.waitForTimeout(400); await page.keyboard.press('Enter'); await page.waitForTimeout(4500);
+await page.evaluate(() => { __g.P.hp = 20; __g.damagePlayer(30, 0, 0); }); await page.evaluate(() => { __g.G.manual = true; __g.G.noRender = true; for (let i = 0; i < 60; i++) __g.step(0.05); __g.G.manual = false; __g.G.noRender = false; }); await page.waitForTimeout(500);
+await page.screenshot({ path: '/tmp/s_dead.png' });
+console.log(JSON.stringify(await page.evaluate(() => ({ mode: __g.G.mode, lvl: __g.G.levelIndex })))); console.log(logs.join('\n')); await browser.close();
