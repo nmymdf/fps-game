@@ -228,15 +228,15 @@ function spriteModel(kind, T) {
   const root = new THREE.Group();
   const box = spriteBox(kind + '_front'), vis = box[3] - box[1];
   const tx = spriteTex(kind + '_front'), asp = tx.userData.w / tx.userData.h;
-  const planeH = T.h * (kind === 'heavy' ? 1.02 : kind === 'dog' ? 1.2 : 1.04) / vis, planeW = planeH * asp;
+  const planeH = T.h * (kind === 'heavy' ? 1.06 : kind === 'dog' ? 1.25 : 1.1) / vis, planeW = planeH * asp;
   const geo = new THREE.PlaneGeometry(1, 1); geo.translate(0, 0.5, 0);
-  const mat = new THREE.MeshStandardMaterial({ map: tx, alphaTest: 0.4, roughness: 1, metalness: 0, side: THREE.DoubleSide, emissive: new THREE.Color(0x303038), emissiveMap: tx, emissiveIntensity: 0.55 });
+  const mat = new THREE.MeshStandardMaterial({ map: tx, alphaTest: 0.4, roughness: 1, metalness: 0, side: THREE.DoubleSide, emissive: new THREE.Color(0x484850), emissiveMap: tx, emissiveIntensity: 0.8 });
   const body = new THREE.Mesh(geo, mat); body.scale.set(planeW, planeH, 1); body.position.y = -(1 - box[3]) * planeH;
   body.userData.baseY = body.position.y; body.userData.planeH = planeH; body.userData.planeW = planeW;
   root.add(body);
   const mz = new THREE.Object3D(); mz.position.set(0, T.h * 0.55, 0); root.add(mz);
   const P = { muzzle: mz };
-  const setFlash = (on) => { mat.emissive.set(on ? 0xff2a18 : 0x303038); mat.emissiveIntensity = on ? 1.6 : 0.55; mat.emissiveMap = on ? null : mat.map; mat.needsUpdate = true; };
+  const setFlash = (on) => { mat.emissive.set(on ? 0xff2a18 : 0x484850); mat.emissiveIntensity = on ? 1.6 : 0.8; mat.emissiveMap = on ? null : mat.map; mat.needsUpdate = true; };
   return { root, body, P, sc: 1, kind, sprite: true, mat, setFlash, tex: {} };
 }
 const FLASHMAT = new THREE.MeshBasicMaterial({ color: 0xff6a5a });
@@ -293,15 +293,17 @@ export class Enemy {
       this.blob.scale.setScalar(1 + Math.min(1, this.deadT / 0.7) * 0.7);
       return;
     }
+    const gal = k === 'dog' && moving, gph = Math.sin(this.walkP * 1.05);
     if (dot > 0.64) key = (this.state === 'attack' && (this.T.melee || this.sinceShot < 0.22)) ? 'fire' : 'front';
     else if (dot < -0.64) key = 'back';
     else { key = 'side'; mir = faceRight ? -1 : 1; }
+    if (gal && key === 'front' && gph > 0.15) key = 'fire';
     const tt = tex(key); if (mat.map !== tt && !this.flashT) { mat.map = tt; mat.emissiveMap = tt; }
     else if (mat.map !== tt) mat.map = tt;
     const s = Math.sin(this.walkP), c = Math.cos(this.walkP);
-    const bob = moving ? Math.abs(c) * 0.045 : Math.sin(this.t * 1.7) * 0.006;
-    const squash = 1 + (moving ? Math.abs(c) * 0.012 : 0);
-    let lean = moving ? s * 0.035 : 0, sx = 1;
+    const bob = gal ? Math.abs(gph) * 0.3 : moving ? Math.abs(c) * 0.045 : Math.sin(this.t * 1.7) * 0.006;
+    const squash = gal ? 1 - gph * 0.07 : 1 + (moving ? Math.abs(c) * 0.012 : 0);
+    let lean = gal ? gph * 0.12 * mir : moving ? s * 0.035 : 0, sx = gal ? 1 + gph * 0.06 : 1;
     if (this.state === 'pain') { lean = -0.12; sx = 0.95; }
     if (this.state === 'attack') { const kick = Math.max(0, 1 - (this.sinceShot || 9) * 7); lean -= kick * 0.05; }
     b.scale.set(W * mir * sx, H * squash, 1); b.position.y = b.userData.baseY + bob; b.rotation.z = lean;

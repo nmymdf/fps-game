@@ -1,0 +1,13 @@
+import { chromium } from 'playwright-core';
+const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl', '--no-sandbox', '--disable-gpu-sandbox', '--allow-file-access-from-files'] });
+const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+const logs = []; page.on('pageerror', (e) => logs.push('PAGEERROR: ' + e.message));
+await page.goto('file://' + process.argv[2]); await page.waitForFunction(() => window.__g, null, { timeout: 60000 });
+await page.evaluate(() => __g.newGame(1, 0)); await page.waitForFunction(() => __g.G.mode === 'playing', null, { timeout: 120000 }); await page.waitForTimeout(1000);
+const r = await page.evaluate(() => { const g = __g, it = g.G.items.find((i) => i.type.startsWith('weapon_')); if (!it) return 'no weapon item'; g.G.manual = true;
+  const before = JSON.stringify(g.P.weapons); g.P.x = it.x - 4; g.P.z = it.z; g.P.yaw = Math.PI / 2; g.step(0.016); g.step(0.016); return { type: it.type, y: it.y, before };
+});
+console.log(r);
+await page.evaluate(() => __g.eng.composer.render()); await page.waitForTimeout(300); await page.screenshot({ path: '/tmp/pg_before.png' });
+const r2 = await page.evaluate(() => { const g = __g, it = g.G.items.find((i) => i.type.startsWith('weapon_')); g.P.x = it.x; g.P.z = it.z; g.step(0.016); g.step(0.016); return { taken: it.taken, weapons: g.P.weapons }; });
+console.log(JSON.stringify(r2), logs.join('\n')); await browser.close();

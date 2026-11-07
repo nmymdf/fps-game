@@ -86,19 +86,19 @@ export function buildItem(type, sub) {
     default: {
       if (type.startsWith('weapon_')) {
         const gun = buildGun(type.slice(7), true).group;
-        gun.rotation.y = Math.PI / 2; g.add(gun); glow = 0xffffff; scale = 1.5; y = 1.0;
+        gun.rotation.y = Math.PI / 2; g.add(gun); glow = 0xffd070; scale = 1.5; y = 1.05;
       }
     }
   }
   const SK = { food: ['item_food', 0.62], medkit: ['item_medkit', 0.6], ammo: ['item_ammo', 0.56], shells: ['item_shells', 0.5], armor: ['item_armor', 0.7], key_gold: ['item_key_gold', 0.8], key_silver: ['item_key_silver', 0.8],
-    weapon_smg: ['item_gun_smg', 0.28], weapon_shotgun: ['item_gun_shotgun', 0.15], weapon_rifle: ['item_gun_rifle', 0.17] };
+    weapon_smg: ['item_gun_smg', 0.46], weapon_shotgun: ['item_gun_shotgun', 0.25], weapon_rifle: ['item_gun_rifle', 0.28] };
   const TK = { cup: ['item_cup', 0.72], cross: ['item_cross', 0.75], crown: ['item_crown', 0.6], chest: ['item_chest', 0.7] };
   const sk = type === 'treasure' ? TK[sub] : SK[type];
   if (sk && spriteTex(sk[0])) {
     const tx = spriteTex(sk[0]), asp = tx.userData.w / tx.userData.h;
     while (g.children.length) g.remove(g.children[0]);
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tx, alphaTest: 0.35, transparent: false }));
-    sp.scale.set(sk[1] * asp, sk[1], 1); g.add(sp); scale = 1.25;
+    sp.scale.set(sk[1] * asp, sk[1], 1); if (type.startsWith('weapon_')) sp.material.rotation = 0.32; g.add(sp); scale = 1.25;
   }
   g.scale.setScalar(scale);
   const wrap = new THREE.Group(); wrap.add(g);
