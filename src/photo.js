@@ -14,8 +14,9 @@ const SPRITES = {};
 import gF from './img/guard_front.webp'; import gB from './img/guard_back.webp'; import gS from './img/guard_side.webp'; import gX from './img/guard_fire.webp'; import gD from './img/guard_dead.webp';
 import oF from './img/officer_front.webp'; import oB from './img/officer_back.webp'; import oS from './img/officer_side.webp'; import oX from './img/officer_fire.webp'; import oD from './img/officer_dead.webp';
 import hF from './img/heavy_front.webp'; import hB from './img/heavy_back.webp'; import hS from './img/heavy_side.webp'; import hX from './img/heavy_fire.webp'; import hD from './img/heavy_dead.webp';
+import dF from './img/dog_front.webp'; import dB from './img/dog_back.webp'; import dS from './img/dog_side.webp'; import dX from './img/dog_fire.webp'; import dD from './img/dog_dead.webp';
 import iAmmo from './img/item_ammo.webp'; import iCup from './img/item_cup.webp'; import iFood from './img/item_food.webp'; import iKg from './img/item_key_gold.webp'; import iKs from './img/item_key_silver.webp'; import iMed from './img/item_medkit.webp';
-Object.assign(SPRITES, { heavy_front: hF, heavy_back: hB, heavy_side: hS, heavy_fire: hX, heavy_dead: hD, guard_front: gF, guard_back: gB, guard_side: gS, guard_fire: gX, guard_dead: gD, officer_front: oF, officer_back: oB, officer_side: oS, officer_fire: oX, officer_dead: oD, item_ammo: iAmmo, item_cup: iCup, item_food: iFood, item_key_gold: iKg, item_key_silver: iKs, item_medkit: iMed });
+Object.assign(SPRITES, { dog_front: dF, dog_back: dB, dog_side: dS, dog_fire: dX, dog_dead: dD, heavy_front: hF, heavy_back: hB, heavy_side: hS, heavy_fire: hX, heavy_dead: hD, guard_front: gF, guard_back: gB, guard_side: gS, guard_fire: gX, guard_dead: gD, officer_front: oF, officer_back: oB, officer_side: oS, officer_fire: oX, officer_dead: oD, item_ammo: iAmmo, item_cup: iCup, item_food: iFood, item_key_gold: iKg, item_key_silver: iKs, item_medkit: iMed });
 
 const SRC = { brick: wallBrick, brick2: wallBrick2, stone: wallStone, marble: wallMarble, floorHex, floorCobble, ceil: ceilBeams, doorWood, doorIron, doorExit };
 const canv = {}, imgs = {};
