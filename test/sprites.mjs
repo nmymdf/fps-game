@@ -5,7 +5,7 @@ const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome'
 const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
 const logs = []; page.on('pageerror', (e) => logs.push('PAGEERROR: ' + e.message + '\n' + (e.stack || '').slice(0, 500))); page.on('console', (m) => { if (m.type() === 'error') logs.push(m.text()); });
 await page.goto('file://' + html); await page.waitForFunction(() => window.__g, null, { timeout: 60000 });
-for (const [L, t] of [[1, 'dog']]) {
+for (const [L, t] of [[3, 'heavy']]) {
   await page.evaluate((L) => { __g.G.manual = false; __g.newGame(L, 0); }, L); await page.waitForFunction(() => __g.G.mode === 'playing', null, { timeout: 120000 }); await page.waitForTimeout(1500);
   const modes = ['front', 'sideA', 'sideB', 'back', 'fire', 'dead'];
   for (const md of modes) {

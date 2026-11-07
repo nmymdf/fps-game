@@ -241,7 +241,7 @@ function spriteModel(kind, T) {
 }
 const FLASHMAT = new THREE.MeshBasicMaterial({ color: 0xff6a5a });
 
-const SPRITE_TYPES = ['guard', 'officer', 'heavy', 'dog'];
+const SPRITE_TYPES = ['guard', 'officer', 'heavy', 'dog', 'boss'];
 
 export class Enemy {
   constructor(def, mgr) {
@@ -284,7 +284,7 @@ export class Enemy {
     const tex = (n) => spriteTex(k + '_' + n);
     if (this.dead) {
       key = 'dead'; const t = Math.min(1, this.deadT / 0.25), dd = tex('dead'), box = spriteBox(k + '_dead');
-      const wv = this.T.h * (k === 'dog' ? 1.5 : 1.25);
+      const wv = this.T.h * (k === 'dog' ? 1.5 : k === 'boss' ? 1.05 : 1.25);
       const sw = wv / (box[2] - box[0]), sh = sw * dd.userData.h / dd.userData.w;
       if (this._dd !== 1) { this._dd = 1; this._dm = Math.random() < 0.5 ? 1 : -1; }
       mat.map = dd; mat.emissiveMap = dd;
