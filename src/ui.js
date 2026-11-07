@@ -1,6 +1,30 @@
 import { TITLE, VERSION, AUTHOR } from './const.js';
-import faceUrl from './img/face.webp';
+import faceUrl from './img/face_hurt.webp';
+import faceBad from './img/face_bad.webp';
+import faceDead from './img/face_dead.webp';
+export const FACES = { ok: faceUrl, bad: faceBad, dead: faceDead };
 import pistolUrl from './img/pistol.webp';
+import smgUrl from './img/gun_smg.webp';
+import shotgunUrl from './img/gun_shotgun.webp';
+import rifleUrl from './img/gun_rifle.webp';
+import knifeUrl from './img/gun_knife.webp';
+// 武器圖擺放：h=高度(vh) asp=寬/高 m=槍口在圖上的位置 d=槍管朝後方向 t=槍口離準星距離(vh)
+// 槍口放在準星的右下方、沿槍管方向，所以槍管延長線正好穿過準星中心
+export const GUNCFG = {
+  pistol: { url: pistolUrl, rot: 0, h: 64, asp: 773 / 591, m: [0.02, 0.05], d: [0.94, 0.34], t: 10, fl: 0.34, org: '80% 90%' },
+  smg: { url: smgUrl, rot: -14, h: 90, asp: 1, m: [0.31, 0.16], d: [0.86, 0.51], t: 9, fl: 0.2, org: '70% 80%' },
+  shotgun: { url: shotgunUrl, rot: -10, h: 100, asp: 1, m: [0.176, 0.15], d: [0.8, 0.6], t: 11, fl: 0.3, org: '70% 80%' },
+  rifle: { url: rifleUrl, rot: -5, h: 100, asp: 1, m: [0.116, 0.11], d: [0.95, 0.32], t: 12, fl: 0.22, org: '70% 80%' },
+  knife: { url: knifeUrl, h: 90, asp: 1, abs: [-19.8, -3], fl: 0, org: '75% 30%' },
+};
+for (const c of Object.values(GUNCFG)) if (c.d) { const a = (c.rot || 0) * Math.PI / 180; c.d = [c.d[0] * Math.cos(a) - c.d[1] * Math.sin(a), c.d[0] * Math.sin(a) + c.d[1] * Math.cos(a)]; }
+const gunHtml = () => Object.entries(GUNCFG).map(([k, c]) => {
+  const w = c.h * c.asp; let l, tp;
+  if (c.abs) { l = c.abs[0]; tp = c.abs[1]; } else { l = c.t * c.d[0] - c.m[0] * w; tp = c.t * c.d[1] - c.m[1] * c.h; }
+  const st = `height:${c.h}vh;width:${w}vh;left:calc(50% + ${l.toFixed(2)}vh);top:calc(50% + ${tp.toFixed(2)}vh);transform-origin:${c.abs ? c.org : (c.m[0] * 100) + '% ' + (c.m[1] * 100) + '%'}`;
+  if (c.abs) return `<div class="g2" id="g2-${k}" style="${st};top:${tp}vh"><img src="${c.url}" alt=""></div>`;
+  return `<div class="g2" id="g2-${k}" style="${st}"><img src="${c.url}" alt=""><div class="fl" style="left:${c.m[0] * 100}%;top:${c.m[1] * 100}%;width:${c.fl * 100}%"></div></div>`;
+}).join('');
 
 const CSS = `
 #ui{position:fixed;inset:0;pointer-events:none;font-family:"Microsoft JhengHei","微軟正黑體","PingFang TC","Noto Sans TC",sans-serif;color:#f3ead4}
@@ -19,10 +43,12 @@ const CSS = `
 .val.low{color:#ff5a4a;animation:pulse .8s infinite}
 @keyframes pulse{50%{opacity:.55}}
 #face{height:clamp(96px,15vh,170px);width:auto;align-self:center;margin-top:-1.2vh;filter:drop-shadow(0 0 10px rgba(255,170,50,.55));transition:filter .25s}
-#face.hurt{filter:drop-shadow(0 0 12px #f00) sepia(1) saturate(4) hue-rotate(-30deg) brightness(.9)}
-#gun2d{position:absolute;pointer-events:none;height:54vh;aspect-ratio:773/591;left:calc(50% - 17vh);bottom:calc(clamp(104px,16vh,180px) - 11vh);transform-origin:68% 100%;will-change:transform}
-#gun2d img{width:100%;height:100%;display:block;filter:drop-shadow(0 8px 12px rgba(0,0,0,.55))}
-#gun2d .fl{position:absolute;left:-2%;top:-1%;width:26%;aspect-ratio:1;border-radius:50%;opacity:0;background:radial-gradient(circle,#fff 0,#ffe9a0 22%,rgba(255,170,50,.75) 45%,rgba(255,120,20,0) 70%);mix-blend-mode:screen}
+#face.hurt{filter:drop-shadow(0 0 14px #f00) brightness(1.25) saturate(1.5)}
+#gun2d{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.g2{position:absolute;display:none;will-change:transform}
+.g2.on{display:block}
+.g2 img{width:100%;height:100%;display:block;filter:drop-shadow(0 8px 12px rgba(0,0,0,.55))}
+.g2 .fl{position:absolute;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;opacity:0;background:radial-gradient(circle,#fff 0,#ffe9a0 22%,rgba(255,170,50,.75) 45%,rgba(255,120,20,0) 70%);mix-blend-mode:screen}
 .bar{width:clamp(80px,9vw,150px);height:clamp(7px,1.1vh,13px);border-radius:7px;background:rgba(0,0,0,.65);border:1px solid rgba(255,255,255,.12);margin-top:.5vh;overflow:hidden}
 .bar i{display:block;height:100%;width:100%;transition:width .2s}
 .bar.r i{background:linear-gradient(180deg,#ff6a5a,#c01818)}.bar.b i{background:linear-gradient(180deg,#78b4ff,#2a5fc0)}
@@ -37,7 +63,10 @@ const CSS = `
 #cross i:nth-child(1){left:-1px;top:-16px;width:2px;height:8px}#cross i:nth-child(2){left:-1px;top:8px;width:2px;height:8px}
 #cross i:nth-child(3){top:-1px;left:-16px;height:2px;width:8px}#cross i:nth-child(4){top:-1px;left:8px;height:2px;width:8px}
 #cross b{position:absolute;left:-2px;top:-2px;width:4px;height:4px;border-radius:50%;background:#ffe6a0;box-shadow:0 0 5px #000}
-#cross.hit i,#cross.hit b{background:#ff5040}
+#cross{transition:transform .06s}
+#cross.hit i,#cross.hit b{background:#ff5040}#cross.hit{transform:scale(1.5)}
+#cross.kill i,#cross.kill b{background:#ff2a1a;box-shadow:0 0 8px #f00,0 0 3px #000}#cross.kill{transform:scale(2.1) rotate(45deg)}
+#cross.head i,#cross.head b{background:#ffd23a}
 #toasts{position:absolute;left:2vw;top:2.5vh;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
 .toast{font-size:clamp(22px,3.4vh,38px);font-weight:700;padding:6px 16px;background:rgba(10,8,6,.62);border-left:5px solid #e8c25a;border-radius:3px;text-shadow:0 2px 4px #000;animation:tin .25s ease-out;transition:opacity .5s}
 .toast.bad{border-color:#ff5a4a}.toast.good{border-color:#7ae27a}
@@ -99,7 +128,7 @@ export function mountUI() {
   <canvas id="mini" width="260" height="260"></canvas>
   <div id="wlist"></div>
   <div id="prompt"></div>
-  <div id="gun2d"><img id="gunimg" src="${pistolUrl}" alt=""><div class="fl" id="gunfl"></div></div>
+  <div id="gun2d">${gunHtml()}</div>
   <div class="hud" id="hud">
     <div class="side l">
       <div class="blk"><div class="lab" id="lvname">第 1 關</div><div class="val sm" id="kills" style="font-size:clamp(22px,3.6vh,42px)">0/0</div></div>

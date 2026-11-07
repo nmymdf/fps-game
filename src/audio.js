@@ -328,6 +328,9 @@ export class AudioEngine {
       case 'die_player': sy.voice(t, 240, 60, 1.0, 0.35 * v, [600, 1000]); break;
       case 'bite': { const g = sy.noise(t, 0.1, 0.35 * v, { type: 'bandpass', f0: 1200, q: 1.5 }); sy.out(g, 0); break; }
       case 'hit': { sy.tone(t, 160, 0.06, 0.25 * v, 'square', { wet: 0 }); break; }
+      case 'hitmark': sy.fm(t, mtof(88), 0.09, 0.22 * v, { ratio: 3, index: 0.8, decay: 0.07, wet: 0.05 }); break;
+      case 'headshot': [0, 1].forEach((i) => sy.fm(t + i * 0.05, mtof(91 + i * 5), 0.14, 0.26 * v, { ratio: 2, index: 1.2, decay: 0.1, wet: 0.1 })); break;
+      case 'killmark': [0, 1, 2].forEach((i) => sy.fm(t + i * 0.055, mtof(79 + i * 4), 0.16, 0.26 * v, { ratio: 2, index: 1.4, decay: 0.12, wet: 0.15 })); break;
       case 'ui': sy.fm(t, mtof(84), 0.08, 0.14 * v, { ratio: 2, index: 1, decay: 0.08, wet: 0.2 }); break;
       case 'ui_ok': [0, 1].forEach((i) => sy.fm(t + i * 0.07, mtof(79 + i * 7), 0.15, 0.16 * v, { ratio: 2, index: 1, decay: 0.12, wet: 0.3 })); break;
       case 'step_dog': { const g = sy.noise(t, 0.03, 0.15 * v, { type: 'lowpass', f0: 900 }); sy.out(g, 0); break; }

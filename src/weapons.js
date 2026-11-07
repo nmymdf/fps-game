@@ -266,8 +266,8 @@ export class ViewModel {
     this.root.position.set(px, py, pz);
     this.root.rotation.set(rx, ry, rz); this.root.scale.setScalar(PL[5]);
     // 手槍改用照片圖：把動作量交給 2D 層，3D 手槍與火光隱藏
-    this.anim = { dx: px - PL[0], dy: py - PL[1], k, rz: rz - PL[4], lower, flash: this.flashT > 0 };
-    if (this.cur === 'pistol') { m.group.visible = false; this.flash.visible = false; }
+    this.anim = { dx: px - PL[0], dy: py - PL[1], k, rz: rz - PL[4], lower, flash: this.flashT > 0, swing: this.swing > 0 ? Math.sin(Math.min(1, this.swing) * Math.PI) : 0, reload: this.reloadT > 0 ? Math.sin(Math.min(1, this.reloadT) * Math.PI) : 0, pump: this.pumpT !== undefined ? this.pumpT : -1, cur: this.cur };
+    m.group.visible = false; this.flash.visible = false;
     if (this.flashT > 0) { this.flashT -= dt; if (this.flashT <= 0) { this.flash.visible = false; } }
     this.light.intensity = Math.max(0, this.light.intensity - dt * 60);
   }

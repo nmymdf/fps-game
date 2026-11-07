@@ -1,3 +1,4 @@
+import { spriteTex } from './photo.js';
 import * as THREE from 'three';
 import { metal, plain } from './decor.js';
 import { sprites, crossTex } from './textures.js';
@@ -88,6 +89,13 @@ export function buildItem(type, sub) {
         gun.rotation.y = Math.PI / 2; g.add(gun); glow = 0xffffff; scale = 1.5; y = 1.0;
       }
     }
+  }
+  const sk = { food: ['item_food', 0.62], medkit: ['item_medkit', 0.6], ammo: ['item_ammo', 0.56], key_gold: ['item_key_gold', 0.8], key_silver: ['item_key_silver', 0.8] }[type === 'treasure' ? (sub === 'cup' ? 'cupx' : '') : type] || (type === 'treasure' && sub === 'cup' ? ['item_cup', 0.72] : null);
+  if (sk && spriteTex(sk[0])) {
+    const tx = spriteTex(sk[0]), asp = tx.userData.w / tx.userData.h;
+    while (g.children.length) g.remove(g.children[0]);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tx, alphaTest: 0.35, transparent: false }));
+    sp.scale.set(sk[1] * asp, sk[1], 1); g.add(sp); scale = 1.25;
   }
   g.scale.setScalar(scale);
   const wrap = new THREE.Group(); wrap.add(g);

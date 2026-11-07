@@ -600,9 +600,14 @@ import { photoSet, hasPhoto } from './photo.js';
 const PHOTO = {
   stoneGrey: ['stone', { }], stoneSand: ['stone', { mul: [1.22, 1.02, 0.78], bright: 1.05 }], stoneBlue: ['stone', { mul: [0.82, 0.94, 1.22] }],
   roughStone: ['stone', { bright: 0.85 }], cellarStone: ['stone', { bright: 0.62, mul: [1, 0.95, 0.95] }],
-  cellarBrick: ['brick', { }], cellarBrickDark: ['brick', { mul: [0.82, 0.72, 0.72], bright: 0.78 }],
-  floorFlag: ['floorHex', { mul: [0.9, 0.86, 0.9], bright: 0.95 }], floorCobble: ['floorHex', { }], floorFlagDark: ['floorHex', { mul: [0.72, 0.68, 0.76], bright: 0.7 }], floorCobbleDark: ['floorHex', { bright: 0.62 }],
-  door: ['door', { normal: 1.6 }],
+  cellarBrick: ['brick', { }], cellarBrickDark: ['brick2', { mul: [0.8, 0.72, 0.72], bright: 0.75 }],
+  marbleWhite: ['marble', { normal: 0.8, rough: 0.45 }], marbleBlue: ['marble', { mul: [0.82, 0.92, 1.2], normal: 0.8, rough: 0.45 }], marbleDark: ['marble', { mul: [0.42, 0.45, 0.62], bright: 0.9, normal: 0.8, rough: 0.4 }],
+  floorFlag: ['floorHex', { mul: [0.9, 0.86, 0.9], bright: 0.95 }], floorCobble: ['floorCobble', { }], floorFlagDark: ['floorHex', { mul: [0.72, 0.68, 0.76], bright: 0.7 }], floorCobbleDark: ['floorCobble', { bright: 0.6 }],
+  ceilStone: ['ceil', { bright: 0.8, mul: [0.9, 0.9, 0.95] }], ceilPlaster: ['ceil', { mul: [1.1, 1.0, 0.9] }], ceilDark: ['ceil', { bright: 0.55 }],
+  door: ['doorWood', { aspect: true, normal: 1.6, size: 784 }],
+  doorGold: ['doorIron', { aspect: true, normal: 1.6, size: 784, mul: [1.55, 1.2, 0.55], bright: 1.05, plate: 'gold' }],
+  doorSilver: ['doorIron', { aspect: true, normal: 1.6, size: 784, mul: [1.1, 1.15, 1.3], bright: 1.15, plate: 'silver' }],
+  exit: ['doorExit', { aspect: true, normal: 1.4, size: 784 }],
 };
 export function getSet(name) {
   return cached(name, () => {

@@ -21,6 +21,7 @@ export const TYPES = {
 // ---------- 模型 ----------
 import { RB, CY, SP, CAP, TOR, CONE, addOutline } from './shapes.js';
 import { buildGun } from './weapons.js';
+import { spriteTex, spriteBox } from './photo.js';
 const litCache = new Map();
 const L = (c, rough = 0.8, k = 0.3, met = 0) => { const key = c + ':' + rough + ':' + k + ':' + met; if (!litCache.has(key)) litCache.set(key, new THREE.MeshStandardMaterial({ color: c, roughness: rough, metalness: met, emissive: c, emissiveIntensity: k })); return litCache.get(key); };
 const steel = (c, k = 0.2) => L(c, 0.42, k, 0.55);
@@ -221,7 +222,26 @@ function dogModel() {
   return { root, body, P, sc: 1.25, kind: 'dog' };
 }
 
+
+// ---------- 精靈（照片）敵人：依視角切換 正面／側面／背面／開火／倒地 ----------
+function spriteModel(kind, T) {
+  const root = new THREE.Group();
+  const box = spriteBox(kind + '_front'), vis = box[3] - box[1];
+  const tx = spriteTex(kind + '_front'), asp = tx.userData.w / tx.userData.h;
+  const planeH = T.h * (kind === 'heavy' ? 1.02 : 1.04) / vis, planeW = planeH * asp;
+  const geo = new THREE.PlaneGeometry(1, 1); geo.translate(0, 0.5, 0);
+  const mat = new THREE.MeshStandardMaterial({ map: tx, alphaTest: 0.4, roughness: 1, metalness: 0, side: THREE.DoubleSide, emissive: new THREE.Color(0x303038), emissiveMap: tx, emissiveIntensity: 0.55 });
+  const body = new THREE.Mesh(geo, mat); body.scale.set(planeW, planeH, 1); body.position.y = -(1 - box[3]) * planeH;
+  body.userData.baseY = body.position.y; body.userData.planeH = planeH; body.userData.planeW = planeW;
+  root.add(body);
+  const mz = new THREE.Object3D(); mz.position.set(0, T.h * 0.55, 0); root.add(mz);
+  const P = { muzzle: mz };
+  const setFlash = (on) => { mat.emissive.set(on ? 0xff2a18 : 0x303038); mat.emissiveIntensity = on ? 1.6 : 0.55; mat.emissiveMap = on ? null : mat.map; mat.needsUpdate = true; };
+  return { root, body, P, sc: 1, kind, sprite: true, mat, setFlash, tex: {} };
+}
 const FLASHMAT = new THREE.MeshBasicMaterial({ color: 0xff6a5a });
+
+const SPRITE_TYPES = ['guard', 'officer', 'heavy'];
 
 export class Enemy {
   constructor(def, mgr) {
@@ -232,7 +252,7 @@ export class Enemy {
     this.state = 'idle'; this.t = Math.random() * 3; this.react = 0; this.cool = 1; this.windT = 0; this.shots = 0; this.burstLeft = 0;
     this.pain = 0; this.dead = false; this.deadT = 0; this.flashT = 0; this.walkP = Math.random() * 6; this.aimed = 0;
     this.stuck = 0; this.sigX = this.x; this.sigZ = this.z; this.openT = 0; this.stateTimer = 0; this.alertT = 0;
-    const m = def.type === 'dog' ? dogModel() : humanoid(def.type);
+    const m = def.type === 'dog' ? dogModel() : (SPRITE_TYPES.includes(def.type) && spriteTex(def.type + '_front')) ? spriteModel(def.type, this.T) : humanoid(def.type);
     this.m = m; this.group = m.root; this.group.position.set(this.x, 0, this.z);
     this.group.traverse((o) => { if (o.isMesh) o.userData.orig = o.material; });
     const blob = new THREE.Mesh(new THREE.PlaneGeometry(1.4 * m.sc, 1.4 * m.sc), new THREE.MeshBasicMaterial({ map: sprites().blob, transparent: true, depthWrite: false, opacity: 0.8 }));
@@ -246,10 +266,49 @@ export class Enemy {
   }
   get cell() { return [Math.floor(this.x / CELL), Math.floor(this.z / CELL)]; }
   setFlash(on) {
+    if (this.m.sprite) { this.m.setFlash(on); return; }
     this.group.traverse((o) => { if (o.isMesh && o.userData.orig) o.material = on ? FLASHMAT : o.userData.orig; });
   }
   // ---- 動畫 ----
+  animateSprite(dt, moving) {
+    const m = this.m, g = this.group, b = m.body, mat = m.mat, pp = this.mgr.pp || { x: this.x, z: this.z + 5 };
+    this.walkP += dt * (moving ? this.T.speed * 3.3 : 0);
+    g.position.set(this.x, 0, this.z); g.rotation.set(0, 0, 0);
+    const dx = pp.x - this.x, dz = pp.z - this.z, k = m.kind, H = b.userData.planeH, W = b.userData.planeW;
+    b.rotation.y = Math.atan2(dx, dz);
+    const fx = Math.sin(this.face), fz = Math.cos(this.face), dl = Math.hypot(dx, dz) || 1;
+    const dot = (fx * dx + fz * dz) / dl, crs = (fx * dz - fz * dx) / dl;
+    const rx = dz / dl, rz = -dx / dl; // 觀看者的右方向（以敵人指向玩家為視線反向）
+    const faceRight = (fx * rx + fz * rz) > 0;
+    let key, mir = 1;
+    const tex = (n) => spriteTex(k + '_' + n);
+    if (this.dead) {
+      key = 'dead'; const t = Math.min(1, this.deadT / 0.25), dd = tex('dead'), box = spriteBox(k + '_dead');
+      const wv = this.T.h * 1.25;
+      const sw = wv / (box[2] - box[0]), sh = sw * dd.userData.h / dd.userData.w;
+      if (this._dd !== 1) { this._dd = 1; this._dm = Math.random() < 0.5 ? 1 : -1; }
+      mat.map = dd; mat.emissiveMap = dd;
+      b.scale.set(sw * (0.8 + 0.2 * t) * this._dm, sh * (1.5 - 0.5 * t), 1);
+      b.position.y = -(1 - box[3]) * sh; b.rotation.z = 0;
+      this.blob.scale.setScalar(1 + Math.min(1, this.deadT / 0.7) * 0.7);
+      return;
+    }
+    if (dot > 0.64) key = (this.state === 'attack' && this.sinceShot < 0.22) ? 'fire' : 'front';
+    else if (dot < -0.64) key = 'back';
+    else { key = 'side'; mir = faceRight ? -1 : 1; }
+    const tt = tex(key); if (mat.map !== tt && !this.flashT) { mat.map = tt; mat.emissiveMap = tt; }
+    else if (mat.map !== tt) mat.map = tt;
+    const s = Math.sin(this.walkP), c = Math.cos(this.walkP);
+    const bob = moving ? Math.abs(c) * 0.045 : Math.sin(this.t * 1.7) * 0.006;
+    const squash = 1 + (moving ? Math.abs(c) * 0.012 : 0);
+    let lean = moving ? s * 0.035 : 0, sx = 1;
+    if (this.state === 'pain') { lean = -0.12; sx = 0.95; }
+    if (this.state === 'attack') { const kick = Math.max(0, 1 - (this.sinceShot || 9) * 7); lean -= kick * 0.05; }
+    b.scale.set(W * mir * sx, H * squash, 1); b.position.y = b.userData.baseY + bob; b.rotation.z = lean;
+    if (this._dd) this._dd = 0;
+  }
   animate(dt, moving) {
+    if (this.m.sprite) return this.animateSprite(dt, moving);
     const P = this.m.P, T = this.T, g = this.group, body = this.m.body;
     this.walkP += dt * (moving ? T.speed * 3.3 : 0);
     const s = Math.sin(this.walkP), c = Math.cos(this.walkP);
@@ -407,7 +466,7 @@ export class Enemies {
     e.sinceShot = 0;
     const m = e.m.P.muzzle; e.group.updateMatrixWorld(true);
     const wp = new THREE.Vector3(); m.getWorldPosition(wp);
-    e.fl.position.copy(wp); e.fl.visible = true; e.flT = 0.06; e.fl.material.rotation = Math.random() * 6;
+    if (!e.m.sprite) { e.fl.position.copy(wp); e.fl.visible = true; e.flT = 0.06; e.fl.material.rotation = Math.random() * 6; }
     this.ctx.sfx && this.ctx.sfx('shot_' + e.type, e.x, e.z);
     const pellets = T.pellets || 1;
     let hits = 0;
@@ -422,6 +481,7 @@ export class Enemies {
     } else this.ctx.sfx && this.ctx.sfx('whiz', p.x, p.z);
   }
   update(dt, p) {
+    this.pp = p;
     this.makeField(p.x, p.z);
     const W = this.world.W;
     for (const e of this.list) {

@@ -6,7 +6,7 @@ import { Enemies, TYPES } from './enemies.js';
 import { ViewModel, WEAPONS, WEAPON_ORDER } from './weapons.js';
 import { buildItem, TREASURE_SCORE, TREASURE_NAME, ITEM_NAME } from './items.js';
 import { AudioEngine, TRACKS } from './audio.js';
-import { mountUI } from './ui.js';
+import { mountUI, GUNCFG, FACES } from './ui.js';
 import { CELL, EYE, WALL_H, THEMES, VERSION } from './const.js';
 import { flames } from './decor.js';
 import { sprites, getSet, setTexSize } from './textures.js';
@@ -222,7 +222,7 @@ function fire() {
   P.mag[P.cur]--; P.cd = W.rate;
   const [ay, ap] = P.cur === 'shotgun' ? [0, 0] : aimAssist();
   const spreadK = P.moving ? 1.4 : 1;
-  let killedAny = false, hitAny = false;
+  let killedAny = false, hitAny = false, headAny = false;
   for (let k = 0; k < (W.pellets || 1); k++) {
     const sy = (Math.random() - 0.5) * 2 * W.spread * spreadK + (k === 0 ? ay : ay * 0.5), sp = (Math.random() - 0.5) * 2 * W.spread * spreadK * 0.7 + (k === 0 ? ap : ap * 0.5);
     const [dx, dy, dz] = aimDir(sy, sp); const r = hitscan(dx, dy, dz);
@@ -230,16 +230,23 @@ function fire() {
       const dmg = W.dmg[0] + Math.random() * (W.dmg[1] - W.dmg[0]);
       const dist = r.t; const falloff = P.cur === 'shotgun' ? Math.max(0.25, 1 - dist / 22) : 1;
       const kill = G.enemies.hurt(r.hit.enemy, Math.round(dmg * falloff), r.hit.head);
-      spawnFx(r.px, r.py, r.pz, 'blood', 3); hitAny = true; killedAny = killedAny || kill;
+      spawnFx(r.px, r.py, r.pz, 'blood', 3); hitAny = true; killedAny = killedAny || kill; headAny = headAny || !!r.hit.head;
     } else { spawnFx(r.px, r.py, r.pz, 'spark', 3); spawnFx(r.px, r.py, r.pz, 'dust', 1); }
   }
   vm.fire(W); audio.sfx(P.cur); if (P.cur === 'shotgun') setTimeout(() => audio.sfx('pump'), 380);
   P.pitch += W.kick * 0.5 * (0.6 + Math.random() * 0.4); P.yaw += (Math.random() - 0.5) * W.kick * 0.3;
   G.enemies.noise(P.x, P.z, P.cur === 'knife' ? 0 : 16);
   P.firing = true; P.firingT = 0.5;
-  if (hitAny) { const c = $('cross'); c.classList.add('hit'); setTimeout(() => c.classList.remove('hit'), 110); }
+  if (hitAny) hitMark(killedAny, headAny);
   if (P.mag[P.cur] <= 0 && P.ammo[W.ammo] > 0) setTimeout(() => { if (P.alive && P.mag[P.cur] <= 0) startReload(); }, W.rate * 1000 + 50);
   return true;
+}
+let hitTm = 0;
+function hitMark(kill, head) {
+  const c = $('cross'); c.classList.remove('hit', 'kill', 'head'); void c.offsetWidth;
+  c.classList.add(kill ? 'kill' : 'hit'); if (head) c.classList.add('head');
+  clearTimeout(hitTm); hitTm = setTimeout(() => c.classList.remove('hit', 'kill', 'head'), kill ? 420 : 160);
+  audio.sfx(kill ? 'killmark' : head ? 'headshot' : 'hitmark');
 }
 function startReload() {
   const W = WEAPONS[P.cur];
@@ -591,20 +598,29 @@ function updateHud(dt) {
   P.lookT -= dt; if (P.lookT <= 0) { P.lookT = 0.8 + Math.random() * 1.8; P.look = [-1, 0, 0, 1][Math.floor(Math.random() * 4)]; }
   if (P.moodT > 0) { P.moodT -= dt; if (P.moodT <= 0 && P.alive) P.mood = 'normal'; }
   const fc = ui.face, hpf = Math.max(0, P.hp / 100);
+  const fk = !P.alive || P.mood === 'dead' ? 'dead' : hpf < 0.6 ? 'bad' : 'ok';
+  if (fc.dataset.k !== fk) { fc.dataset.k = fk; fc.src = FACES[fk]; }
   fc.className = P.mood === 'hurt' ? 'hurt' : '';
-  fc.style.filter = P.mood === 'dead' ? 'grayscale(1) brightness(.45)' : P.mood === 'hurt' ? '' : hpf < 0.35 ? `saturate(${0.5 + hpf}) brightness(${0.7 + hpf * 0.5}) drop-shadow(0 0 10px rgba(255,60,40,.6))` : '';
+  fc.style.filter = P.mood === 'hurt' ? '' : (fk === 'bad' && hpf < 0.3) ? 'drop-shadow(0 0 10px rgba(255,60,40,.7))' : '';
   $('hpbar').style.width = (hpf * 100) + '%'; $('arbar').style.width = Math.min(100, P.armor) + '%';
   gun2d();
 }
-const gunEl = () => $('gun2d');
+const GD = { pistol: [0.94, 0.34], smg: [0.86, 0.51], shotgun: [0.8, 0.6], rifle: [0.95, 0.32], knife: [0.6, 0.8] };
+let gunCur = '';
 function gun2d() {
-  const el = gunEl(), a = vm.anim, show = P.cur === 'pistol' && a && P.alive;
-  const vis = show ? '' : 'none'; if (el.style.visibility !== (show ? 'visible' : 'hidden')) el.style.visibility = show ? 'visible' : 'hidden';
+  const a = vm.anim, show = !!a && P.alive;
+  const root = $('gun2d'); if (root.style.visibility !== (show ? 'visible' : 'hidden')) root.style.visibility = show ? 'visible' : 'hidden';
   if (!show) return;
-  const K = innerHeight * 2.3;
-  const x = a.dx * K, y = -a.dy * K + a.k * innerHeight * 0.03, rot = -a.rz * 30 - a.k * 1.6;
-  el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) rotate(${rot.toFixed(2)}deg) scale(${(1 + a.k * 0.02).toFixed(3)})`;
-  $('gunfl').style.opacity = a.flash ? (0.85 + Math.random() * 0.15) : 0;
+  if (a.cur !== gunCur) { if (gunCur) $('g2-' + gunCur).classList.remove('on'); gunCur = a.cur; $('g2-' + gunCur).classList.add('on'); }
+  const el = $('g2-' + gunCur), H = innerHeight, K = H * 2.3, d = GUNCFG[gunCur].d || GD[gunCur];
+  let x = a.dx * K, y = -a.dy * K, rot = -a.rz * 30;
+  // 後座力：沿槍管往後退並微微上抬
+  const rc = a.k * H * (gunCur === 'shotgun' ? 0.05 : gunCur === 'rifle' ? 0.04 : 0.03);
+  x += d[0] * rc; y += d[1] * rc; rot -= a.k * (gunCur === 'shotgun' ? 2.6 : 1.6);
+  if (a.pump >= 0.25 && a.pump < 0.7 && gunCur === 'shotgun') { const p = Math.sin((a.pump - 0.25) / 0.45 * Math.PI); x += p * H * 0.04; y += p * H * 0.05; }
+  if (gunCur === 'knife') { const e = a.swing; x -= e * H * 0.3; y -= e * H * 0.2; rot -= e * 30; }
+  el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) rotate(${(rot + (GUNCFG[gunCur].rot || 0)).toFixed(2)}deg)`;
+  const fl = el.querySelector('.fl'); if (fl) fl.style.opacity = a.flash ? (0.85 + Math.random() * 0.15) : 0;
 }
 let prompt = '';
 function updatePrompt() {

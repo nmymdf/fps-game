@@ -10,6 +10,6 @@ await page.evaluate(() => { const P = __g.P; for (const k of ['smg','shotgun','r
 for (const id of (process.env.W || 'knife,pistol,smg,shotgun,rifle').split(',')) {
   await page.evaluate((id) => { __g.P.cur = id; __g.vm.show(id); __g.vm.next = null; __g.vm.switchT = 1; }, id);
   await page.waitForTimeout(700);
-  await page.screenshot({ path: `${out}_${id}.png`, clip: { x: 320, y: 260, width: 640, height: 460 } });
+  await page.screenshot({ path: `${out}_${id}.png`, fullPage: false });
 }
 console.log(logs.join('\n')); await browser.close();
