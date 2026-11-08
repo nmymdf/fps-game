@@ -1,5 +1,5 @@
 // 全程式合成：DOS 時代 FM 音源風格的音樂 + 音效（WebAudio）
-const MINOR = [0, 2, 3, 5, 7, 8, 10];
+const MINOR = [0, 2, 3, 5, 7, 8, 11]; // 和聲小調：第七級升高，帶出軍樂的緊張感
 const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
 function degSemi(d) { const o = Math.floor(d / 7), i = ((d % 7) + 7) % 7; return o * 12 + MINOR[i]; }
 const P = (s) => s.trim().split(/\s+/).map((t) => (t === '.' || t === '-' ? t : Number(t)));
@@ -8,12 +8,12 @@ const P = (s) => s.trim().split(/\s+/).map((t) => (t === '.' || t === '-' ? t : 
 // prog: 和弦根音(音階級數)；dom=大三和弦(屬和弦)。mel: 每小節8個八分音符。
 export const TRACKS = {
   courtyard: {
-    name: '庭院行軍', bpm: 132, root: 57, drums: 'march', bass: 'walk', arp: 'up', lead: 'fmLead', pad: 'organ', swing: 0,
+    name: '庭院行軍', bpm: 148, root: 57, drums: 'march', bass: 'walk', arp: 'up', lead: 'fmLead', pad: 'organ', swing: 0,
     prog: [{ r: 0 }, { r: 5 }, { r: 6 }, { r: 4 }, { r: 0 }, { r: 5 }, { r: 4, dom: 1 }, { r: 0 }],
     mel: ['4 2 0 2 4 4 7 6', '5 7 9 7 5 7 9 -', '6 8 10 8 6 8 6 5', '4 6 8 6 4 . 4 -', '7 9 11 9 7 4 7 9', '12 11 9 7 9 11 12 -', '11 8 11 8 7 8 4 .', '7 4 2 4 0 - - -'],
   },
   hall: {
-    name: '大廳', bpm: 126, root: 50, drums: 'march', bass: 'pulse', arp: 'updown', lead: 'fmBell', pad: 'strings', swing: 0,
+    name: '大廳', bpm: 138, root: 50, drums: 'march', bass: 'pulse', arp: 'updown', lead: 'fmBell', pad: 'strings', swing: 0,
     prog: [{ r: 0 }, { r: 5 }, { r: 2 }, { r: 6 }, { r: 3 }, { r: 5 }, { r: 4, dom: 1 }, { r: 0 }],
     mel: ['2 4 7 4 2 4 7 9', '9 7 5 7 9 12 9 7', '6 4 2 4 6 9 6 4', '6 8 10 8 6 8 10 -', '7 5 3 5 7 10 7 5', '5 7 9 12 9 7 5 .', '11 8 4 8 11 8 4 .', '7 - 4 - 2 4 7 -'],
   },
@@ -23,7 +23,7 @@ export const TRACKS = {
     mel: ['4 . 2 . 4 . 7 -', '9 . 7 . 5 . 7 -', '10 . 8 . 6 . 8 -', '7 . 4 . 2 . 4 -', '4 2 4 7 9 7 4 2', '7 . 5 . 3 . 5 -', '9 7 5 7 9 12 9 -', '10 8 6 8 10 8 6 .'],
   },
   cellar: {
-    name: '地牢', bpm: 144, root: 48, drums: 'drive', bass: 'drive', arp: 'up', lead: 'fmSaw', pad: 'dark', swing: 0,
+    name: '地牢', bpm: 160, root: 48, drums: 'drive', bass: 'drive', arp: 'up', lead: 'fmSaw', pad: 'dark', swing: 0,
     prog: [{ r: 0 }, { r: 5 }, { r: 6 }, { r: 4, dom: 1 }, { r: 0 }, { r: 5 }, { r: 4, dom: 1 }, { r: 0 }],
     mel: ['4 4 2 0 2 4 7 4', '5 7 9 7 5 7 9 7', '6 8 10 8 6 8 10 8', '8 4 8 11 8 4 . .', '7 4 2 4 7 9 11 9', '12 9 7 9 12 9 7 5', '11 8 4 8 11 8 4 8', '7 - 4 - 0 - - -'],
   },
@@ -33,7 +33,7 @@ export const TRACKS = {
     mel: ['4 - 2 - 0 - 2 -', '4 - 6 - 4 - 2 -', '7 - 9 - 7 - 5 -', '8 - 10 - 8 - 6 -', '4 - 7 - 9 - 7 -', '5 - 7 - 10 - 7 -', '8 - 11 - 8 - 4 -', '7 - - - 4 - 0 -'],
   },
   throne: {
-    name: '王座', bpm: 156, root: 57, drums: 'drive', bass: 'drive', arp: 'up16', lead: 'fmSaw', pad: 'strings', swing: 0,
+    name: '王座', bpm: 172, root: 57, drums: 'drive', bass: 'drive', arp: 'up16', lead: 'fmSaw', pad: 'strings', swing: 0,
     prog: [{ r: 0 }, { r: 5 }, { r: 2 }, { r: 6 }, { r: 0 }, { r: 5 }, { r: 4, dom: 1 }, { r: 4, dom: 1 }],
     mel: ['7 4 7 9 11 9 7 4', '5 7 9 12 9 7 5 7', '9 11 13 11 9 11 9 6', '13 10 8 10 13 10 8 6', '7 4 7 9 11 14 11 9', '12 9 7 9 12 9 7 9', '11 8 11 8 4 8 11 .', '11 8 4 8 11 8 11 .'],
   },
@@ -187,7 +187,7 @@ export function scheduleBar(S, tr, bar, t0, inten, lay) {
     const d = L.drums;
     for (let i = 0; i < 16; i++) {
       const t = t0 + i * s16;
-      if (styl === 'march') { if (i === 0 || i === 8 || i === 10) S.kick(t, 0.5 * d); if (i === 4 || i === 12) S.snare(t, 0.3 * d); if (i % 2 === 0) S.hat(t, 0.05 * d, false); if (i === 14) S.snare(t, 0.14 * d); }
+      if (styl === 'march') { if (i === 0 || i === 8 || i === 10) S.kick(t, 0.5 * d); if (i === 4 || i === 12) S.snare(t, 0.3 * d); if (i % 2 === 0) S.hat(t, 0.05 * d, false); if (i === 14) S.snare(t, 0.14 * d); if (bar % 4 === 3 && i >= 12) S.snare(t, (0.12 + (i - 12) * 0.05) * d); }
       else if (styl === 'drive') { if (i % 4 === 0 || i === 10) S.kick(t, 0.55 * d); if (i === 4 || i === 12) S.snare(t, 0.34 * d); S.hat(t, (i % 2 ? 0.035 : 0.07) * d, false); if (bar % 4 === 3 && i >= 12) S.snare(t, 0.2 * d); }
       else { if (i === 0 || i === 10) S.kick(t, 0.32 * d); if (i === 8) S.snare(t, 0.16 * d); if (i % 4 === 2) S.hat(t, 0.04 * d); }
     }
