@@ -12,9 +12,9 @@ import knifeUrl from './img/gun_knife.webp';
 // 槍口放在準星的右下方、沿槍管方向，所以槍管延長線正好穿過準星中心
 export const GUNCFG = {
   pistol: { url: pistolUrl, rot: 0, h: 64, asp: 773 / 591, m: [0.02, 0.05], d: [0.94, 0.34], t: 10, fl: 0.34, org: '80% 90%' },
-  smg: { url: smgUrl, rot: 0, h: 71.3, asp: 1.041, m: [0.581, 0.002], d: [-0.192, 0.981], o: [2.07, -21.13], t: 0, fl: 0.1, org: '70% 80%' },
-  shotgun: { url: shotgunUrl, rot: 0, h: 64.6, asp: 1.040, m: [0.501, 0.003], d: [0.001, 1.000], o: [0.52, -21.99], t: 0, fl: 0.1, org: '70% 80%' },
-  rifle: { url: rifleUrl, rot: 0, h: 71.1, asp: 1.063, m: [0.574, 0.002], d: [-0.188, 0.982], o: [2.16, -20.96], t: 0, fl: 0.1, org: '70% 80%' },
+  smg: { url: smgUrl, rot: 0, h: 44.2, asp: 1.041, m: [0.581, 0.002], d: [-0.192, 0.981], o: [5, -2], t: 0, fl: 0.1, org: '70% 80%' },
+  shotgun: { url: shotgunUrl, rot: 0, h: 40.1, asp: 1.040, m: [0.501, 0.003], d: [0.001, 1.000], o: [4, -2], t: 0, fl: 0.1, org: '70% 80%' },
+  rifle: { url: rifleUrl, rot: 0, h: 44.1, asp: 1.063, m: [0.574, 0.002], d: [-0.188, 0.982], o: [5, -2], t: 0, fl: 0.1, org: '70% 80%' },
   knife: { url: knifeUrl, h: 90, asp: 1, abs: [-19.8, -3], fl: 0, org: '75% 30%' },
 };
 for (const c of Object.values(GUNCFG)) if (c.d) { const a = (c.rot || 0) * Math.PI / 180; c.d = [c.d[0] * Math.cos(a) - c.d[1] * Math.sin(a), c.d[0] * Math.sin(a) + c.d[1] * Math.cos(a)]; }

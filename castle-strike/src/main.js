@@ -16,14 +16,24 @@ import { loadPhotos } from './photo.js';
 const SAVE = 'castleStrike.v1';
 const load = () => { try { return JSON.parse(localStorage.getItem(SAVE)) || {}; } catch { return {}; } };
 const save = (o) => { try { localStorage.setItem(SAVE, JSON.stringify({ ...load(), ...o })); } catch { /* 無法存檔也沒關係 */ } };
-const settings = Object.assign({ music: 70, sfx: 90, sens: 100, quality: 'high', diff: 'easy' }, load().settings || {});
+const settings = Object.assign({ music: 70, musicOn: false, sfx: 90, sens: 100, quality: 'high', diff: 'easy' }, load().settings || {});
 
 setTexSize(settings.quality === 'high' ? 1024 : 512);
 const ui = mountUI(); const $ = ui.$;
 const canvas = document.getElementById('c');
 const eng = createEngine(canvas, settings.quality);
 const { scene, camera } = eng;
-const audio = new AudioEngine(); audio.setVolumes(settings.music / 100 * 1.1, settings.sfx / 100);
+const audio = new AudioEngine();
+function applyVol() { audio.setVolumes(settings.musicOn ? settings.music / 100 * 1.1 : 0, settings.sfx / 100); }
+applyVol();
+// 音樂開關：畫面左上角按鈕＋M 鍵
+const mb = document.createElement('div'); mb.id = 'musicbtn';
+mb.style.cssText = 'position:fixed;left:1.5vh;top:1.5vh;z-index:99;padding:.5vh 1.6vh;font:700 clamp(18px,3vh,30px) sans-serif;color:#ffe9a8;background:rgba(20,14,10,.78);border:2px solid #e0b040;border-radius:10px;cursor:pointer;user-select:none';
+function paintMusic() { mb.textContent = '♪ 音樂：' + (settings.musicOn ? '開' : '關') + '（M）'; mb.style.opacity = settings.musicOn ? 1 : .8; }
+function toggleMusic() { settings.musicOn = !settings.musicOn; applyVol(); save({ settings }); paintMusic(); }
+mb.addEventListener('click', (e) => { e.stopPropagation(); toggleMusic(); });
+mb.addEventListener('mousedown', (e) => e.stopPropagation());
+paintMusic(); document.body.appendChild(mb);
 const vm = new ViewModel(eng.vmScene);
 const fxSprites = sprites();
 
@@ -506,7 +516,7 @@ $('s-help').querySelector('.btn').addEventListener('click', () => closeHelp());
 const sv = { music: 'r-music', sfx: 'r-sfx', sens: 'r-sens' };
 for (const k in sv) $(sv[k]).addEventListener('input', (e) => {
   settings[k] = Number(e.target.value); $('v-' + k).textContent = settings[k];
-  audio.setVolumes(settings.music / 100 * 1.1, settings.sfx / 100); save({ settings });
+  applyVol(); save({ settings });
 });
 function paintDiff() { [...$('seg-d').children].forEach((b) => b.classList.toggle('on', b.dataset.d === settings.diff)); }
 function paintQuality() { [...$('seg-q').children].forEach((b) => b.classList.toggle('on', b.dataset.q === settings.quality)); }
@@ -515,6 +525,7 @@ $('seg-q').addEventListener('click', (e) => { const q = e.target.dataset && e.ta
 
 // ======================= 輸入 =======================
 window.addEventListener('keydown', (e) => {
+  if (e.code === 'KeyM' && !e.repeat) { toggleMusic(); return; }
   if (e.repeat && !['ArrowDown', 'ArrowUp'].includes(e.code)) { if (G.mode === 'playing') e.preventDefault(); return; }
   audio.init();
   const c = e.code;
