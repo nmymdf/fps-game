@@ -11,7 +11,7 @@ for (const [L, t] of (process.env.LV ? JSON.parse(process.env.LV) : [[0, 'guard'
   for (const md of modes) {
     const ok = await page.evaluate(([t, md, DIST]) => {
       const g = __g, w = g.G.world, P = g.P, e = g.G.enemies.list.find((q) => q.type === t); if (!e) return false;
-      g.G.manual = true; e.dead = false; e.state = 'idle';
+      g.G.manual = true; document.getElementById('gun2d').style.display='none'; e.dead = false; e.state = 'idle';
       for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) for (const d of DIST) { const x = e.x + dx * d, z = e.z + dz * d; if (!w.collides(x, z, 0.4) && w.los(x, z, e.x, e.z)) {
         P.x = x; P.z = z; P.yaw = Math.atan2(-dx, dz); P.pitch = 0;
         const toP = Math.atan2(dx, dz); const off = { front: 0, sideA: Math.PI / 2, sideB: -Math.PI / 2, back: Math.PI, fire: 0, dead: 0 }[md];

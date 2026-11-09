@@ -10,7 +10,7 @@ import { mountUI, GUNCFG, FACES } from './ui.js';
 import { CELL, EYE, WALL_H, THEMES, VERSION } from './const.js';
 import { flames } from './decor.js';
 import { sprites, getSet, setTexSize } from './textures.js';
-import { loadPhotos } from './photo.js';
+import { loadPhotos, spriteTex } from './photo.js';
 
 // ======================= 基本設定 =======================
 const SAVE = 'castleStrike.v1';
@@ -126,11 +126,41 @@ function populate(fresh) {
   G.kills = 0; G.treasure = 0; G.secrets = 0; G.levelTime = 0; G.bossDead = false; G.winT = 0; G.deadT = 0;
   G.enemies = new Enemies(scene, w, lv, enemyCtx);
   for (const e of G.enemies.list) { enableShadows(e.group); e.blob.visible = false; }
+  spawnHostage(lv);
   for (const it of lv.items) addItem(it.type, (it.gx + 0.5) * CELL, (it.gz + 0.5) * CELL, it.sub);
   if (G.mode !== 'title') {
     vm.show(P.cur); vm.next = null; vm.switchT = 1;
   }
   refreshWeaponList();
+}
+function spawnHostage(lv) {
+  if (G.hostage && G.hostage.sp) scene.remove(G.hostage.sp);
+  G.hostage = null; if (!lv.hostage) return;
+  const tx = spriteTex('hostage_front'); if (!tx) return;
+  const H = 1.7, asp = tx.userData.w / tx.userData.h;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tx, alphaTest: 0.35 }));
+  sp.scale.set(H * asp, H, 1); sp.center.set(0.5, 0);
+  const x = (lv.hostage.gx + 0.5) * CELL, z = (lv.hostage.gz + 0.5) * CELL;
+  sp.position.set(x, 0, z); scene.add(sp);
+  G.hostage = { sp, x, z, freed: false, t: 0, H, asp };
+}
+function freeHostage() {
+  const h = G.hostage; if (!h || h.freed) return;
+  h.freed = true; h.t = 0; P.score += 3000; P.hp = Math.min(100, P.hp + 30);
+  audio.sfx('secret'); toast('人質獲救！ +3000　體力 +30', 'good'); P.flash = 0.5; P.mood = 'grin'; P.moodT = 1.5;
+}
+function updateHostage(dt) {
+  const h = G.hostage; if (!h || !h.sp.visible) return;
+  if (!h.freed) { h.sp.position.y = 0; return; }
+  h.t += dt; const ex = G.lv.exit;
+  const tx = (ex.x + 0.5) * CELL, tz = (ex.z + 0.5) * CELL, dx = tx - h.x, dz = tz - h.z, d = Math.hypot(dx, dz);
+  if (d < 1.2 || h.t > 9) { h.sp.visible = false; return; }
+  const sp = 5.2 * dt;
+  const r = G.world.tryMove(h.x, h.z, dx / d * sp, dz / d * sp, 0.25);
+  if (Math.hypot(r[0] - h.x, r[1] - h.z) < sp * 0.2) { h.t += dt * 2; }
+  h.x = r[0]; h.z = r[1];
+  h.sp.position.set(h.x, Math.abs(Math.sin(h.t * 11)) * 0.18, h.z);
+  h.sp.material.rotation = Math.sin(h.t * 11) * 0.09;
 }
 function addItem(type, x, z, sub, drop = false) {
   const b = buildItem(type, sub);
@@ -354,8 +384,14 @@ function updatePlayer(dt) {
   P.pitch += (0 - P.pitch) * Math.min(1, dt * 0.0); // 不自動回正
   if (P.firingT > 0) { P.firingT -= dt; if (P.firingT <= 0) P.firing = false; }
 }
+function hostageNear() {
+  const h = G.hostage; if (!h || h.freed) return false;
+  const dx = h.x - P.x, dz = h.z - P.z, d = Math.hypot(dx, dz); if (d > 2.4) return false;
+  const a = Math.atan2(dx, -dz); let da = Math.abs(((a - P.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI); return da < 0.9 || d < 1.2;
+}
 function interact() {
   if (!P.alive) return;
+  if (hostageNear()) { freeHostage(); return; }
   const w = G.world, hit = w.findInteract(P.x, P.z, P.yaw, 3.4); if (!hit) return;
   if (hit.type === 'door') {
     const r = w.openDoor(hit.door, P.keys);
@@ -363,6 +399,7 @@ function interact() {
     else if (r === 'locked_silver') { toast('需要銀鑰匙', 'bad'); audio.sfx('locked'); }
   } else if (hit.type === 'push') { w.push(hit.pw); }
   else if (hit.type === 'exit') {
+    if (G.hostage && !G.hostage.freed) { toast('還有人質沒救出來！', 'bad'); audio.sfx('locked'); return; }
     if (G.levelIndex === LEVELS.length - 1 && !G.bossDead) { toast('統領還在城裡！先打倒他', 'bad'); audio.sfx('locked'); return; }
     finishLevel();
   }
@@ -640,9 +677,10 @@ function updatePrompt() {
   let t = '';
   if (G.mode === 'playing' && P.alive) {
     const h = G.world.findInteract(P.x, P.z, P.yaw, 3.0);
-    if (h) {
+    if (hostageNear()) t = '按 <kbd>E</kbd> 解開繩子，救出人質';
+    else if (h) {
       if (h.type === 'door') { const d = h.door; t = d.kind === 'gold' && !P.keys.gold ? '需要 金鑰匙' : d.kind === 'silver' && !P.keys.silver ? '需要 銀鑰匙' : '按 <kbd>E</kbd> 開門'; }
-      else if (h.type === 'exit') t = G.levelIndex === LEVELS.length - 1 && !G.bossDead ? '先打倒統領' : '按 <kbd>E</kbd> 搭電梯離開';
+      else if (h.type === 'exit') t = G.hostage && !G.hostage.freed ? '先救出人質' : G.levelIndex === LEVELS.length - 1 && !G.bossDead ? '先打倒統領' : '按 <kbd>E</kbd> 搭電梯離開';
     }
   }
   if (t !== prompt) { prompt = t; const el = $('prompt'); el.innerHTML = t; el.classList.toggle('on', !!t); }
@@ -672,7 +710,7 @@ function frame(now, dtOv) {
       if (P.meleeT > 0) { P.meleeT -= dt; if (P.meleeT <= 0) meleeStrike(); }
       if ((mouseDown) && (WEAPONS[P.cur].auto || !P.fireLatch)) { if (fire() && !WEAPONS[P.cur].auto) P.fireLatch = true; }
       if (!mouseDown) P.fireLatch = false;
-      updateItems(dt);
+      updateItems(dt); updateHostage(dt);
       updatePrompt();
       mapT -= dt; if (mapT <= 0) { mapT = 0.2; markSeen(); if (mapOn) drawMap(ui.mapc, false); }
       musicT -= dt;
@@ -717,4 +755,4 @@ requestAnimationFrame(frame);
 (async () => { showScreen('s-load'); await loadPhotos(); await prefetch('courtyard', '載入中…'); toTitle(); })();
 
 // 測試／除錯接口
-window.__g = { step: (dt) => frame(performance.now(), dt), G, P, keys, camera, eng, vm, fire, interact, startLevel, newGame, toTitle, pauseGame, switchWeapon, finishLevel, victory, damagePlayer, audio, WEAPONS, TYPES, settings, drawMap };
+window.__g = { freeHostage, step: (dt) => frame(performance.now(), dt), G, P, keys, camera, eng, vm, fire, interact, startLevel, newGame, toTitle, pauseGame, switchWeapon, finishLevel, victory, damagePlayer, audio, WEAPONS, TYPES, settings, drawMap };

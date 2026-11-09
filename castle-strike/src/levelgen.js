@@ -17,7 +17,7 @@ export const LEVELS = [
     foes: { guard: 58, dog: 14, officer: 28 }, weapon: 'shotgun' },
   { name: '藏書閣', size: 46, rooms: 11, minRoom: 5, maxW: 11, maxH: 9, gates: 2, dens: 18, theme: 'library', seed: 3303,
     foes: { guard: 42, dog: 18, officer: 40 }, weapon: 'rifle' },
-  { name: '地下酒窖', size: 48, rooms: 12, minRoom: 5, maxW: 11, maxH: 9, gates: 2, dens: 16, theme: 'cellar', seed: 4404,
+  { name: '地下酒窖', size: 48, rooms: 12, minRoom: 5, maxW: 11, maxH: 9, gates: 2, dens: 16, theme: 'cellar', hostage: true, seed: 4404,
     foes: { guard: 34, dog: 16, officer: 28, heavy: 22 }, weapon: null },
   { name: '禮拜塔', size: 48, rooms: 12, minRoom: 5, maxW: 11, maxH: 9, gates: 2, dens: 15, theme: 'chapel', seed: 5505,
     foes: { guard: 26, dog: 14, officer: 30, heavy: 30 }, weapon: null },
@@ -25,7 +25,7 @@ export const LEVELS = [
     foes: { guard: 30, dog: 16, officer: 30, heavy: 24 }, weapon: null },
   { name: '軍械地牢', size: 52, rooms: 13, minRoom: 5, maxW: 11, maxH: 9, gates: 2, dens: 13, theme: 'cellar', seed: 8808,
     foes: { guard: 22, dog: 14, officer: 28, heavy: 36 }, weapon: null },
-  { name: '貴賓長廊', size: 50, rooms: 12, minRoom: 5, maxW: 12, maxH: 9, gates: 2, dens: 13, theme: 'hall', seed: 9909,
+  { name: '貴賓長廊', size: 50, rooms: 12, minRoom: 5, maxW: 12, maxH: 9, gates: 2, dens: 13, theme: 'hall', hostage: true, seed: 9909,
     foes: { guard: 24, dog: 12, officer: 38, heavy: 26 }, weapon: null },
   { name: '皇家藏經室', size: 52, rooms: 13, minRoom: 5, maxW: 11, maxH: 9, gates: 2, dens: 12, theme: 'library', seed: 1313,
     foes: { guard: 20, dog: 12, officer: 36, heavy: 32 }, weapon: null },
@@ -406,6 +406,12 @@ function gen(index, seed) {
   }
   // 起點房補給
   place('ammo', sr); place('food', sr);
+  // 人質
+  if (cfg.hostage) {
+    const cand = rooms.filter((r) => r !== sr).sort((a, b) => Math.hypot(b.x - sr.x, b.z - sr.z) - Math.hypot(a.x - sr.x, a.z - sr.z));
+    for (const r of cand) { const c = randCell(r); if (c) { level.hostage = { gx: c[0], gz: c[1] }; take(c[0], c[1]); break; } }
+    if (!level.hostage) return null;
+  }
 
   // 隱藏房內容
   for (const cl of closets) {

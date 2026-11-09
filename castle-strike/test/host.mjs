@@ -1,0 +1,12 @@
+import { chromium } from 'playwright-core';
+const b = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true, args: ['--use-angle=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist','--enable-webgl','--no-sandbox','--allow-file-access-from-files'] });
+const p = await b.newPage({ viewport: { width: 960, height: 540 } });
+p.on('pageerror', e => console.log('ERR', e.message));
+await p.goto('file:///home/claude/castle-strike/dist/index.html'); await p.waitForTimeout(2500);
+await p.evaluate(() => { __g.G.manual = true; __g.newGame(3, 0); });
+await p.waitForFunction(() => __g.G.mode === 'playing', null, { timeout: 120000 });
+await p.evaluate(() => { const g=__g,h=g.G.hostage,P=g.P; P.x=h.x-2; P.z=h.z; P.yaw=Math.PI/2; for(let i=0;i<5;i++) g.step(0.05); });
+await p.screenshot({ path: '/tmp/h1.png' });
+await p.evaluate(() => { __g.interact(); for(let i=0;i<12;i++) __g.step(0.05); });
+await p.screenshot({ path: '/tmp/h2.png' });
+await b.close();

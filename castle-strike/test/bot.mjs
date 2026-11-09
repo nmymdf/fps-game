@@ -59,6 +59,15 @@ for (let L = startL; L <= endL; L++) {
     // 殺光敵人（測試統計用）
     for (const e of G.enemies.list) if (!e.dead) G.enemies.hurt(e, 99999, false);
     for (let i = 0; i < 20; i++) step(0.05);
+    let hostInfo = null;
+    if (G.hostage) {
+      const h = G.hostage, hh = [Math.floor(P.x / 3), Math.floor(P.z / 3)];
+      const hp = bfs(hh[0], hh[1], (x, z) => x === Math.floor(h.x / 3) && z === Math.floor(h.z / 3), P.keys);
+      if (!hp) return { error: 'no path to hostage' };
+      walk(hp); P.yaw = Math.atan2(h.x - P.x, -(h.z - P.z)); step(0.05); g.interact(); step(0.05);
+      for (let i = 0; i < 80; i++) step(0.05);
+      hostInfo = { freed: h.freed, vis: h.sp.visible };
+    }
     // 去出口前一格
     const ex = lv.exit, fx = ex.x + DIRS[ex.d][0], fz = ex.z + DIRS[ex.d][1];
     const here = [Math.floor(P.x / 3), Math.floor(P.z / 3)];
@@ -72,7 +81,7 @@ for (let L = startL; L <= endL; L++) {
     step(0.05);
     g.interact();
     step(0.05);
-    return { mode: G.mode, kills: G.kills, kT: lv.enemyCount, tr: G.treasure, tT: lv.treasure, sec: G.secrets, sT: lv.secrets, score: P.score, treasureLeft: items2, time: G.levelTime.toFixed(1), keys: P.keys };
+    return { mode: G.mode, kills: G.kills, kT: lv.enemyCount, tr: G.treasure, tT: lv.treasure, sec: G.secrets, sT: lv.secrets, score: P.score, treasureLeft: items2, time: G.levelTime.toFixed(1), keys: P.keys, hostInfo };
   });
   console.log('L' + (L + 1), JSON.stringify(res));
 }
