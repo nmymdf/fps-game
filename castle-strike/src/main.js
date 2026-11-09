@@ -435,7 +435,7 @@ function toTitle() {
   if (sv.level > 0) items.push({ label: `繼續遊戲（第 ${sv.level + 1} 關）`, act: () => diffMenu(sv.level, sv.score || 0) });
   items.push({ label: '操作說明', act: () => { menuReturn = 'title'; showHelp(); } });
   showMenu('m-title', items); showScreen('s-title'); $('fade').style.opacity = 0;
-  setTimeout(() => { audio.play('courtyard', 0.35); }, 100);
+  setTimeout(() => { audio.play('courtyard', 0.35, 0); }, 100);
 }
 let menuReturn = 'title';
 function diffMenu(lvl, score) {
@@ -477,7 +477,7 @@ function startLevel(i, fresh) {
     $('lvname').textContent = `第 ${i + 1} 關`; $('boss').classList.toggle('on', false);
     toast(`第 ${i + 1} 關　${G.lv.cfg.name}`);
     if (i === 0 && fresh) setTimeout(() => toast('找到金色/銀色鑰匙，打開鎖住的門'), 600);
-    audio.play(G.lv.cfg.theme, i === 5 ? 0.5 : 0.22);
+    audio.play(G.lv.cfg.theme, i === 5 ? 0.5 : 0.22, i);
     $('fade').style.opacity = 0;
     requestLock();
   }, 650);

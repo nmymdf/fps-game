@@ -6,6 +6,9 @@ const P = (s) => s.trim().split(/\s+/).map((t) => (t === '.' || t === '-' ? t : 
 
 // ---------- 曲目 ----------
 // prog: 和弦根音(音階級數)；dom=大三和弦(屬和弦)。mel: 每小節8個八分音符。
+import m1 from './music/lv1.mp3'; import m2 from './music/lv2.mp3'; import m3 from './music/lv3.mp3';
+import m4 from './music/lv4.mp3'; import m5 from './music/lv5.mp3'; import m6 from './music/lv6.mp3';
+const FILE_MUSIC = [m1, m2, m3, m4, m5, m6];
 export const TRACKS = {
   courtyard: {
     name: '庭院行軍', bpm: 148, root: 57, drums: 'march', bass: 'walk', arp: 'up', lead: 'fmLead', pad: 'organ', swing: 0,
@@ -229,19 +232,36 @@ export class AudioEngine {
     this.sSynth = new Synth(c, this.sBus, this.revIn);
     this.ready = true;
     setInterval(() => this.tick(), 40);
-    if (this.pending) { const [id, i] = this.pending; this.pending = null; this.play(id, i); }
+    if (this.pending) { const [id, i, f] = this.pending; this.pending = null; this.play(id, i, f); }
   }
   setVolumes(m, s) { this.musicVol = m; this.sfxVol = s; if (this.ready) { this.mBus.gain.value = m; this.sBus.gain.value = s; } }
   // ----- 音樂 -----
-  play(id, startIntensity = 0.3) {
-    if (!this.ready) { this.pending = [id, startIntensity]; return; }
+  async playFile(idx) {
+    const my = ++this.gen; this.track = 'file' + idx; this.stopFile(0.3);
+    this._bufs = this._bufs || {};
+    if (!this._bufs[idx]) this._bufs[idx] = fetch(FILE_MUSIC[idx]).then((r) => r.arrayBuffer()).then((b) => this.ctx.decodeAudioData(b));
+    let buf; try { buf = await this._bufs[idx]; } catch { return; }
+    if (my !== this.gen) return;
+    const c = this.ctx, src = c.createBufferSource(); src.buffer = buf; src.loop = true;
+    const g = c.createGain(); g.gain.setValueAtTime(0.0001, c.currentTime); g.gain.linearRampToValueAtTime(1, c.currentTime + 1.2);
+    src.connect(g); g.connect(this.mBus); src.start(); this.fileSrc = { src, g };
+    this.mBus.gain.cancelScheduledValues(c.currentTime); this.mBus.gain.setValueAtTime(this.musicVol, c.currentTime);
+  }
+  stopFile(fade = 0.5) {
+    const f = this.fileSrc; if (!f) return; this.fileSrc = null; const t = this.ctx.currentTime;
+    f.g.gain.cancelScheduledValues(t); f.g.gain.setValueAtTime(f.g.gain.value, t); f.g.gain.linearRampToValueAtTime(0.0001, t + fade);
+    try { f.src.stop(t + fade + 0.05); } catch { /* 已停止 */ }
+  }
+  play(id, startIntensity = 0.3, fileIdx = -1) {
+    if (!this.ready) { this.pending = [id, startIntensity, fileIdx]; return; }
+    if (fileIdx >= 0) { if (this.track === 'file' + fileIdx) return; this.playFile(fileIdx); return; }
     if (this.track === id) return;
     this.gen++; this.track = id; this.bar = 0; this.nextT = this.ctx.currentTime + 0.12; this.inten = startIntensity; this.target = startIntensity;
     this.mBus.gain.cancelScheduledValues(this.ctx.currentTime); this.mBus.gain.setValueAtTime(0.0001, this.ctx.currentTime);
     this.mBus.gain.linearRampToValueAtTime(this.musicVol, this.ctx.currentTime + 1.2);
   }
   stop(fade = 1) {
-    if (!this.ready) return; this.track = null; this.gen++;
+    if (!this.ready) return; this.track = null; this.gen++; this.stopFile(fade);
     const t = this.ctx.currentTime; this.mBus.gain.cancelScheduledValues(t); this.mBus.gain.setValueAtTime(this.mBus.gain.value, t); this.mBus.gain.linearRampToValueAtTime(0.0001, t + fade);
   }
   jingle(id) {
@@ -253,7 +273,7 @@ export class AudioEngine {
   }
   setIntensity(v) { this.target = v; }
   tick() {
-    if (!this.ready || !this.track) return;
+    if (!this.ready || !this.track || this.fileSrc || String(this.track).startsWith('file')) return;
     const tr = TRACKS[this.track]; if (!tr) return;
     const spb = 60 / tr.bpm, barLen = spb * 4;
     while (this.nextT < this.ctx.currentTime + 0.35) {
