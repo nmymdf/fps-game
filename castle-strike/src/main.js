@@ -23,6 +23,7 @@ const ui = mountUI(); const $ = ui.$;
 const canvas = document.getElementById('c');
 const eng = createEngine(canvas, settings.quality);
 const { scene, camera } = eng;
+const MUSIC_FOR = [0, 1, 2, 3, 4, 2, 3, 1, 4, 5]; // 每一關配哪一段音樂
 const audio = new AudioEngine();
 function applyVol() { audio.setVolumes(settings.musicOn ? settings.music / 100 * 1.1 : 0, settings.sfx / 100); }
 applyVol();
@@ -142,8 +143,9 @@ function addItem(type, x, z, sub, drop = false) {
 const enemyCtx = {
   sfx: (n, x, z) => audio.sfx(n, x, z),
   hitPlayer: (dmg, fx, fz) => damagePlayer(dmg, fx, fz),
+  onBossPhase: (ph) => { toast(ph === 2 ? '統領發怒了！援軍趕到！' : '統領瘋狂了！最後援軍！', 'bad'); audio.sfx('locked'); },
   onKill: (e) => {
-    G.kills++; P.score += e.T.score;
+    if (!e.summoned) G.kills++; P.score += e.T.score;
     P.mood = 'grin'; P.moodT = 0.9;
     spawnFx(e.x, 1.0, e.z, 'blood', 8);
     if (e.type === 'guard' || e.type === 'officer') addItem('ammo', e.x, e.z, null, true);
@@ -477,7 +479,7 @@ function startLevel(i, fresh) {
     $('lvname').textContent = `第 ${i + 1} 關`; $('boss').classList.toggle('on', false);
     toast(`第 ${i + 1} 關　${G.lv.cfg.name}`);
     if (i === 0 && fresh) setTimeout(() => toast('找到金色/銀色鑰匙，打開鎖住的門'), 600);
-    audio.play(G.lv.cfg.theme, i === 5 ? 0.5 : 0.22, i);
+    audio.play(G.lv.cfg.theme, LEVELS[i].boss ? 0.5 : 0.22, MUSIC_FOR[i] ?? (i % 6));
     $('fade').style.opacity = 0;
     requestLock();
   }, 650);
@@ -674,7 +676,7 @@ function frame(now, dtOv) {
       updatePrompt();
       mapT -= dt; if (mapT <= 0) { mapT = 0.2; markSeen(); if (mapOn) drawMap(ui.mapc, false); }
       musicT -= dt;
-      if (musicT <= 0) { musicT = 0.5; let danger = 0; for (const e of G.enemies.list) if (!e.dead && (e.state === 'chase' || e.state === 'attack') && Math.hypot(e.x - P.x, e.z - P.z) < 28) danger = Math.max(danger, e.boss ? 1 : 0.85); const base = G.levelIndex === 5 ? 0.5 : 0.2; audio.setIntensity(Math.max(base, danger)); }
+      if (musicT <= 0) { musicT = 0.5; let danger = 0; for (const e of G.enemies.list) if (!e.dead && (e.state === 'chase' || e.state === 'attack') && Math.hypot(e.x - P.x, e.z - P.z) < 28) danger = Math.max(danger, e.boss ? 1 : 0.85); const base = LEVELS[G.levelIndex].boss ? 0.5 : 0.2; audio.setIntensity(Math.max(base, danger)); }
       if (G.bossDead) { G.winT -= dt; if (G.winT <= 0) { G.bossDead = false; finishLevel(); } }
     }
     if (G.mode === 'dying') { G.deadT += dt; if (G.deadT > 1.7) { G.mode = 'dead'; P.lives--; const over = P.lives < 0; $('dead-t').textContent = over ? '遊戲結束' : '你倒下了'; $('dead-s').textContent = over ? '三條命都用完了' : `還剩 ${P.lives} 條命`; showMenu('m-dead', over ? [{ label: '從第 1 關重來', act: () => newGame(0, 0) }, { label: '回主選單', act: toTitle }] : [{ label: '再試一次', act: retryLevel }, { label: '回主選單', act: toTitle }]); showScreen('s-dead'); setHudVisible(false); } }

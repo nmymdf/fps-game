@@ -387,6 +387,7 @@ export class Enemy {
   }
 }
 
+const rageOf = (e) => (e.boss ? [1, 1.2, 1.45][(e.phase || 1) - 1] : 1);
 export class Enemies {
   constructor(scene, world, level, ctx) {
     this.scene = scene; this.world = world; this.level = level; this.ctx = ctx;
@@ -447,6 +448,22 @@ export class Enemies {
     e.fl.visible = false;
     this.ctx.sfx && this.ctx.sfx('die_' + e.type, e.x, e.z);
     this.ctx.onKill && this.ctx.onKill(e);
+  }
+  // 首領戰分階段：血量 66%、33% 時發怒並呼叫援軍，之後更快、連射更多
+  bossPhase(e) {
+    const r = e.hp / e.maxHp, ph = r < 0.33 ? 3 : r < 0.66 ? 2 : 1;
+    if (ph <= (e.phase || 1)) return;
+    e.phase = ph; e.cool = 0.4;
+    const kinds = ph === 2 ? ['guard', 'guard', 'officer'] : ['officer', 'guard', 'heavy', 'guard'];
+    kinds.forEach((type, i) => {
+      for (let k = 0; k < 8; k++) {
+        const a = (i / kinds.length + k * 0.13) * 6.28 + 0.4, [nx, nz] = this.world.tryMove(e.x, e.z, Math.cos(a) * 3, Math.sin(a) * 3, 0.4);
+        if (Math.hypot(nx - e.x, nz - e.z) < 2.2) continue;
+        const ne = new Enemy({ type, gx: Math.floor(nx / CELL), gz: Math.floor(nz / CELL), angle: a }, this);
+        ne.summoned = true; ne.x = nx; ne.z = nz; ne.state = 'chase'; this.list.push(ne); break;
+      }
+    });
+    this.ctx.onBossPhase && this.ctx.onBossPhase(ph);
   }
   moveToward(e, tx, tz, speed, dt) {
     const dx = tx - e.x, dz = tz - e.z, d = Math.hypot(dx, dz);
@@ -516,6 +533,7 @@ export class Enemies {
       if (e.flashT > 0) { e.flashT -= dt; if (e.flashT <= 0) e.setFlash(false); }
       if (e.flT > 0) { e.flT -= dt; if (e.flT <= 0) e.fl.visible = false; }
       if (e.dead) { e.deadT += dt; e.animate(dt, false); continue; }
+      if (e.boss) this.bossPhase(e);
       const T = e.T, dx = p.x - e.x, dz = p.z - e.z, dist = Math.hypot(dx, dz);
       const los = p.alive && dist < 60 && this.world.los(e.x, e.z, p.x, p.z);
       const toP = Math.atan2(dx, dz);
@@ -547,13 +565,13 @@ export class Enemies {
             if (los) { this.turnTo(e, toP, dt, 12); moving = this.moveToward(e, p.x, p.z, T.speed, dt); }
             else moving = this.follow(e, dt, T.speed);
           } else if (inRange && e.cool <= 0 && (dist > 3 || Math.random() < 0.5)) {
-            e.state = 'attack'; e.windT = 0; e.aimed = 0; e.burstLeft = T.burst; e.shotT = 0;
+            e.state = 'attack'; e.windT = 0; e.aimed = 0; e.burstLeft = T.burst + (e.boss ? ((e.phase || 1) - 1) * 3 : 0); e.shotT = 0;
           } else if (los && dist < T.range * 0.34 && dist > 3.5) {
             // 保持距離、微調面向
             this.turnTo(e, toP, dt, 6);
           } else if (los && dist > 3) {
             this.turnTo(e, toP, dt, 5);
-            moving = this.follow(e, dt, T.speed * (e.type === 'boss' ? 0.9 : 1));
+            moving = this.follow(e, dt, T.speed * (e.type === 'boss' ? 0.9 * rageOf(e) : 1));
           } else moving = this.follow(e, dt, T.speed);
           if (!moving && !los && dist > 1.5) { e.stuck += dt; if (e.stuck > 1.2) { e.stuck = 0; /* 抖動脫困 */ const a = Math.random() * 6.28; this.moveToward(e, e.x + Math.cos(a), e.z + Math.sin(a), T.speed, 0.3); } } else e.stuck = 0;
           if (los && dist < 10 && e.cool < 0.2 && Math.random() < 0.01) e.cool = 0;
@@ -577,7 +595,7 @@ export class Enemies {
                 this.shoot(e, p); e.burstLeft--; e.shotT = e.type === 'boss' ? 0.09 : (T.burst > 1 ? 0.2 : 0.1);
               }
               if (e.burstLeft <= 0 && e.sinceShot > 0.25) {
-                e.state = 'chase'; e.cool = T.cd[0] + Math.random() * (T.cd[1] - T.cd[0]);
+                e.state = 'chase'; e.cool = (T.cd[0] + Math.random() * (T.cd[1] - T.cd[0])) / rageOf(e);
                 if (!los) e.cool *= 0.4;
               }
             }
