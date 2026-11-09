@@ -300,8 +300,11 @@ export class Enemy {
     const tex = (n) => spriteTex(k + '_' + n);
     if (this.dead) {
       key = 'dead'; const t = Math.min(1, this.deadT / 0.25), dd = tex('dead'), box = spriteBox(k + '_dead');
-      const wv = this.T.h * (k === 'dog' ? 1.5 : k === 'boss' ? 1.05 : 1.25);
-      const sw = wv / (box[2] - box[0]), sh = sw * dd.userData.h / dd.userData.w;
+      const asp = dd.userData.w / dd.userData.h, human = k !== 'dog' && k !== 'boss';
+      let sw, sh;
+      if (human) { // 倒地的人：以最長邊約等於真人身高來縮放，避免屍體比活人大
+        sh = this.T.h * 1.08 / Math.max((box[2] - box[0]) * asp, box[3] - box[1]); sw = sh * asp;
+      } else { const wv = this.T.h * (k === 'dog' ? 1.5 : 1.05); sw = wv / (box[2] - box[0]); sh = sw / asp; }
       if (this._dd !== 1) { this._dd = 1; this._dm = Math.random() < 0.5 ? 1 : -1; }
       mat.map = dd; mat.emissiveMap = dd;
       b.scale.set(sw * (0.8 + 0.2 * t) * this._dm, sh * (1.5 - 0.5 * t), 1);
