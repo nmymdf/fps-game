@@ -300,7 +300,7 @@ export class Enemy {
     const tex = (n) => spriteTex(k + '_' + n);
     if (this.dead) {
       key = 'dead'; const t = Math.min(1, this.deadT / 0.25), dd = tex('dead'), box = spriteBox(k + '_dead');
-      const asp = dd.userData.w / dd.userData.h, human = k !== 'dog' && k !== 'boss';
+      const asp = dd.userData.w / dd.userData.h, human = k !== 'dog';
       let sw, sh;
       if (human) { // 倒地的人：以最長邊約等於真人身高來縮放，避免屍體比活人大
         sh = this.T.h * 1.08 / Math.max((box[2] - box[0]) * asp, box[3] - box[1]); sw = sh * asp;
