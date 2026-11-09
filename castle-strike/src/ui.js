@@ -4,23 +4,23 @@ import faceBad from './img/face_bad.webp';
 import faceDead from './img/face_dead.webp';
 export const FACES = { ok: faceUrl, bad: faceBad, dead: faceDead };
 import pistolUrl from './img/pistol.webp';
-import smgUrl from './img/gun_smg.webp';
-import shotgunUrl from './img/gun_shotgun.webp';
-import rifleUrl from './img/gun_rifle.webp';
+import smgUrl from './img/smg_rear.webp';
+import shotgunUrl from './img/shotgun_rear.webp';
+import rifleUrl from './img/rifle_rear.webp';
 import knifeUrl from './img/gun_knife.webp';
 // 武器圖擺放：h=高度(vh) asp=寬/高 m=槍口在圖上的位置 d=槍管朝後方向 t=槍口離準星距離(vh)
 // 槍口放在準星的右下方、沿槍管方向，所以槍管延長線正好穿過準星中心
 export const GUNCFG = {
   pistol: { url: pistolUrl, rot: 0, h: 64, asp: 773 / 591, m: [0.02, 0.05], d: [0.94, 0.34], t: 10, fl: 0.34, org: '80% 90%' },
-  smg: { url: smgUrl, rot: 18, h: 105, asp: 1, m: [0.31, 0.16], d: [0.86, 0.51], t: -14, fl: 0.2, org: '70% 80%' },
-  shotgun: { url: shotgunUrl, rot: 20, h: 125, asp: 1, m: [0.176, 0.15], d: [0.8, 0.6], t: 2, fl: 0.3, org: '70% 80%' },
-  rifle: { url: rifleUrl, rot: 24, h: 125, asp: 1, m: [0.116, 0.11], d: [0.95, 0.32], t: -2, fl: 0.22, org: '70% 80%' },
+  smg: { url: smgUrl, rot: 0, h: 71.3, asp: 1.041, m: [0.581, 0.002], d: [-0.192, 0.981], o: [2.07, -21.13], t: 0, fl: 0.1, org: '70% 80%' },
+  shotgun: { url: shotgunUrl, rot: 0, h: 64.6, asp: 1.040, m: [0.501, 0.003], d: [0.001, 1.000], o: [0.52, -21.99], t: 0, fl: 0.1, org: '70% 80%' },
+  rifle: { url: rifleUrl, rot: 0, h: 71.1, asp: 1.063, m: [0.574, 0.002], d: [-0.188, 0.982], o: [2.16, -20.96], t: 0, fl: 0.1, org: '70% 80%' },
   knife: { url: knifeUrl, h: 90, asp: 1, abs: [-19.8, -3], fl: 0, org: '75% 30%' },
 };
 for (const c of Object.values(GUNCFG)) if (c.d) { const a = (c.rot || 0) * Math.PI / 180; c.d = [c.d[0] * Math.cos(a) - c.d[1] * Math.sin(a), c.d[0] * Math.sin(a) + c.d[1] * Math.cos(a)]; }
 const gunHtml = () => Object.entries(GUNCFG).map(([k, c]) => {
   const w = c.h * c.asp; let l, tp;
-  if (c.abs) { l = c.abs[0]; tp = c.abs[1]; } else { l = c.t * c.d[0] - c.m[0] * w; tp = c.t * c.d[1] - c.m[1] * c.h; }
+  if (c.abs) { l = c.abs[0]; tp = c.abs[1]; } else { const ox = c.o ? c.o[0] : c.t * c.d[0], oy = c.o ? c.o[1] : c.t * c.d[1]; l = ox - c.m[0] * w; tp = oy - c.m[1] * c.h; }
   const st = `height:${c.h}vh;width:${w}vh;left:calc(50% + ${l.toFixed(2)}vh);top:calc(50% + ${tp.toFixed(2)}vh);transform-origin:${c.abs ? c.org : (c.m[0] * 100) + '% ' + (c.m[1] * 100) + '%'}`;
   if (c.abs) return `<div class="g2" id="g2-${k}" style="${st};top:${tp}vh"><img src="${c.url}" alt=""></div>`;
   return `<div class="g2" id="g2-${k}" style="${st}"><img src="${c.url}" alt=""><div class="fl" style="left:${c.m[0] * 100}%;top:${c.m[1] * 100}%;width:${c.fl * 100}%"></div></div>`;
