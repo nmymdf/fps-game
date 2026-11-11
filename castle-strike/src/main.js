@@ -149,16 +149,31 @@ function freeHostage() {
   h.freed = true; h.t = 0; P.score += 3000; P.hp = Math.min(100, P.hp + 30);
   audio.sfx('secret'); toast('人質獲救！ +3000　體力 +30', 'good'); P.flash = 0.5; P.mood = 'grin'; P.moodT = 1.5;
 }
+function hostagePath() {
+  const W = G.world, Wd = W.W, ex = G.lv.exit, h = G.hostage;
+  const DR = [[1, 0], [-1, 0], [0, 1], [0, -1]], fx = ex.x + DR[ex.d][0], fz = ex.z + DR[ex.d][1];
+  const sx = Math.floor(h.x / CELL), sz = Math.floor(h.z / CELL), prev = new Map(), q = [[sx, sz]]; prev.set(sz * Wd + sx, -1);
+  for (let i = 0; i < q.length; i++) {
+    const [x, z] = q[i];
+    if (x === fx && z === fz) { const path = []; let k = z * Wd + x; while (k !== -1) { path.push([k % Wd, (k / Wd) | 0]); k = prev.get(k); } return path.reverse(); }
+    for (const [dx, dz] of DR) { const nx = x + dx, nz = z + dz; if (!W.inb(nx, nz)) continue; const j = nz * Wd + nx; if (prev.has(j) || W.cells[j] !== 0) continue; if (W.decorCell && W.decorCell.has(j)) continue; prev.set(j, z * Wd + x); q.push([nx, nz]); }
+  }
+  return null;
+}
 function updateHostage(dt) {
   const h = G.hostage; if (!h || !h.sp.visible) return;
   if (!h.freed) { h.sp.position.y = 0; return; }
-  h.t += dt; const ex = G.lv.exit;
-  const tx = (ex.x + 0.5) * CELL, tz = (ex.z + 0.5) * CELL, dx = tx - h.x, dz = tz - h.z, d = Math.hypot(dx, dz);
-  if (d < 1.2 || h.t > 9) { h.sp.visible = false; return; }
-  const sp = 5.2 * dt;
-  const r = G.world.tryMove(h.x, h.z, dx / d * sp, dz / d * sp, 0.25);
-  if (Math.hypot(r[0] - h.x, r[1] - h.z) < sp * 0.2) { h.t += dt * 2; }
-  h.x = r[0]; h.z = r[1];
+  h.t += dt;
+  if (!h.path) { h.path = hostagePath() || []; h.pi = 1; }
+  const W = G.world, ex = G.lv.exit; let tx, tz;
+  if (h.pi < h.path.length) { tx = (h.path[h.pi][0] + 0.5) * CELL; tz = (h.path[h.pi][1] + 0.5) * CELL; }
+  else { tx = (ex.x + 0.5) * CELL; tz = (ex.z + 0.5) * CELL; }
+  const dx = tx - h.x, dz = tz - h.z, d = Math.hypot(dx, dz);
+  if (d < 0.25) { if (h.pi >= h.path.length) { h.sp.visible = false; return; } h.pi++; return; }
+  const gx = Math.floor(tx / CELL), gz = Math.floor(tz / CELL), door = W.doorAt.get(gz * W.W + gx);
+  if (door) W.openDoor(door, { gold: true, silver: true });
+  const sp = Math.min(d, 5.2 * dt); h.x += dx / d * sp; h.z += dz / d * sp;
+  if (h.t > 40) { h.sp.visible = false; return; }
   h.sp.position.set(h.x, Math.abs(Math.sin(h.t * 11)) * 0.18, h.z);
   h.sp.material.rotation = Math.sin(h.t * 11) * 0.09;
 }
@@ -386,8 +401,8 @@ function updatePlayer(dt) {
 }
 function hostageNear() {
   const h = G.hostage; if (!h || h.freed) return false;
-  const dx = h.x - P.x, dz = h.z - P.z, d = Math.hypot(dx, dz); if (d > 2.4) return false;
-  const a = Math.atan2(dx, -dz); let da = Math.abs(((a - P.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI); return da < 0.9 || d < 1.2;
+  const dx = h.x - P.x, dz = h.z - P.z, d = Math.hypot(dx, dz); if (d > 2.2) return false;
+  const a = Math.atan2(dx, -dz); let da = Math.abs(((a - P.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI); return d < 0.9 || da < 0.5;
 }
 function interact() {
   if (!P.alive) return;
