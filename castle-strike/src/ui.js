@@ -73,6 +73,13 @@ const CSS = `
 @keyframes tin{from{transform:translateX(-30px);opacity:0}}
 #prompt{position:absolute;left:0;right:0;bottom:calc(clamp(96px,15vh,170px) + 4vh);text-align:center;font-size:clamp(26px,4.2vh,46px);font-weight:700;text-shadow:0 2px 8px #000,0 0 18px #000;opacity:0;transition:opacity .15s}
 #prompt.on{opacity:1}
+#buffs{position:absolute;left:2vw;bottom:calc(clamp(96px,15vh,170px) + 3vh);display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.buff{display:flex;align-items:center;gap:12px;font-size:clamp(24px,3.8vh,44px);font-weight:800;padding:4px 18px;background:rgba(10,8,6,.7);border-left:6px solid #fff;border-radius:4px;color:#fff}
+.buff span{font-variant-numeric:tabular-nums;min-width:1.6em;text-align:right}
+.buff.speed{border-color:#50c8ff;color:#9adcff}.buff.shield{border-color:#ffd060;color:#ffe08a}.buff.power{border-color:#ff5a3a;color:#ff9a80}
+.buff.low{animation:bl .5s infinite alternate}@keyframes bl{from{opacity:1}to{opacity:.35}}
+#shieldfx{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .25s;box-shadow:inset 0 0 12vh 2vh rgba(255,215,90,.55)}
+#shieldfx.on{opacity:1}
 #prompt kbd{display:inline-block;min-width:1.6em;padding:0 .35em;border:2px solid #e8c25a;border-radius:8px;background:rgba(0,0,0,.6);color:#e8c25a;margin:0 .15em}
 #mini{position:absolute;right:1.5vw;top:2vh;width:clamp(150px,22vh,260px);height:clamp(150px,22vh,260px);border:2px solid rgba(214,170,70,.6);border-radius:6px;background:rgba(8,6,5,.55)}
 #boss{position:absolute;left:25%;right:25%;top:2.5vh;opacity:0;transition:opacity .4s;text-align:center}
@@ -128,6 +135,8 @@ export function mountUI() {
   <canvas id="mini" width="260" height="260"></canvas>
   <div id="wlist"></div>
   <div id="prompt"></div>
+  <div id="buffs"></div>
+  <div id="shieldfx"></div>
   <div id="gun2d">${gunHtml()}</div>
   <div class="hud" id="hud">
     <div class="side l">

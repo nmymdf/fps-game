@@ -11,6 +11,7 @@ import { CELL, EYE, WALL_H, THEMES, VERSION } from './const.js';
 import { flames } from './decor.js';
 import { sprites, getSet, setTexSize } from './textures.js';
 import { loadPhotos, spriteTex } from './photo.js';
+import { Traps } from './traps.js';
 
 // ======================= 基本設定 =======================
 const SAVE = 'castleStrike.v1';
@@ -84,6 +85,8 @@ function toast(msg, cls = '') {
 }
 
 // ======================= 關卡載入 =======================
+const newBuff = () => ({ speed: 0, shield: 0, power: 0 });
+P.buff = newBuff();
 function disposeWorld() {
   if (G.enemies) G.enemies.dispose();
   for (const it of G.items) scene.remove(it.obj);
@@ -92,7 +95,7 @@ function disposeWorld() {
     scene.remove(G.world.group);
     G.world.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
   }
-  flames.length = 0; G.world = null; G.enemies = null;
+  flames.length = 0; G.world = null; G.enemies = null; G.traps = null;
 }
 function enableShadows(root) {
   root.traverse((o) => { if (o.isMesh && o.material && !o.material.isMeshBasicMaterial && !o.userData.isOutline) { o.castShadow = true; o.receiveShadow = true; } });
@@ -106,6 +109,12 @@ function loadWorld(i) {
   G.world.onDoor = (a, x, z, kind) => audio.sfx(a === 'open' ? 'door_open' : 'door_close', x, z);
   G.world.onPush = (x, z) => { audio.sfx('push', x, z); if (G.mode === 'playing') { G.secrets++; toast('發現秘密！', 'good'); setTimeout(() => audio.sfx('secret'), 700); } };
   G.mapSeen = new Uint8Array(G.lv.W * G.lv.H);
+  P.buff = newBuff();
+  G.traps = new Traps(G.lv, G.world, {
+    P, enemies: () => G.enemies, hurtPlayer: (d, x, z) => damagePlayer(d, x, z),
+    sfx: (n, x, z) => audio.sfx(n, x, z), fx: (x, y, z, k, n) => spawnFx(x, y, z, k, n),
+    noise: (x, z, r) => G.enemies && G.enemies.noise(x, z, r),
+  });
 }
 function loadoutFor(i) {
   const w = { knife: true, pistol: true }, mag = { pistol: 12, smg: 0, shotgun: 0, rifle: 0 };
@@ -122,7 +131,7 @@ function populate(fresh) {
   const lv = G.lv, w = G.world;
   P.x = (lv.start.x + 0.5) * CELL; P.z = (lv.start.z + 0.5) * CELL;
   P.yaw = Math.atan2(Math.cos(lv.start.angle), -Math.sin(lv.start.angle)); P.pitch = 0; P.vx = P.vz = 0;
-  P.alive = true; P.keys = { gold: false, silver: false }; P.cd = 0; P.reload = 0; P.meleeT = 0; P.hurtFlash = 0; P.shake = 0;
+  P.buff = newBuff(); P.alive = true; P.keys = { gold: false, silver: false }; P.cd = 0; P.reload = 0; P.meleeT = 0; P.hurtFlash = 0; P.shake = 0;
   G.kills = 0; G.treasure = 0; G.secrets = 0; G.levelTime = 0; G.bossDead = false; G.winT = 0; G.deadT = 0;
   G.enemies = new Enemies(scene, w, lv, enemyCtx);
   for (const e of G.enemies.list) { enableShadows(e.group); e.blob.visible = false; }
@@ -148,6 +157,22 @@ function freeHostage() {
   const h = G.hostage; if (!h || h.freed) return;
   h.freed = true; h.t = 0; P.score += 3000; P.hp = Math.min(100, P.hp + 30);
   audio.sfx('secret'); toast('人質獲救！ +3000　體力 +30', 'good'); P.flash = 0.5; P.mood = 'grin'; P.moodT = 1.5;
+}
+const buffEl = { speed: null, shield: null, power: null }, buffLast = { speed: -1, shield: -1, power: -1 };
+const BUFF_NAME = { speed: '加速', shield: '護盾', power: '雙倍傷害' };
+function updateBuffs(dt) {
+  const box = $('buffs'); if (!box) return;
+  for (const k of ['speed', 'shield', 'power']) {
+    if (P.buff[k] > 0) P.buff[k] = Math.max(0, P.buff[k] - dt);
+    const sec = Math.ceil(P.buff[k]);
+    if (sec === buffLast[k]) { if (buffEl[k]) buffEl[k].classList.toggle('low', P.buff[k] > 0 && P.buff[k] < 3); continue; }
+    buffLast[k] = sec;
+    if (sec > 0) {
+      if (!buffEl[k]) { buffEl[k] = document.createElement('div'); buffEl[k].className = 'buff ' + k; buffEl[k].innerHTML = '<b>' + BUFF_NAME[k] + '</b><span></span>'; box.appendChild(buffEl[k]); }
+      buffEl[k].querySelector('span').textContent = sec;
+    } else if (buffEl[k]) { buffEl[k].remove(); buffEl[k] = null; }
+  }
+  $('shieldfx').classList.toggle('on', P.buff.shield > 0);
 }
 function hostagePath() {
   const W = G.world, Wd = W.W, ex = G.lv.exit, h = G.hostage;
@@ -202,6 +227,7 @@ const enemyCtx = {
 const DIFF = { easy: 0.5, normal: 0.8, hard: 1.2 };
 function damagePlayer(dmg, fx, fz) {
   if (!P.alive || G.mode !== 'playing') return;
+  if (P.buff.shield > 0) { audio.sfx('shield_hit'); P.flash = Math.max(P.flash, 0.18); return; }
   dmg = Math.max(1, Math.round(dmg * (DIFF[settings.diff] || 0.8)));
   if (P.armor > 0) { const ab = Math.min(P.armor, Math.round(dmg * 0.5)); P.armor -= ab; dmg -= ab; }
   P.hp -= dmg; P.hurtFlash = Math.min(1, P.hurtFlash + 0.25 + dmg / 35); P.shake = Math.min(1.5, P.shake + 0.5 + dmg / 25);
@@ -284,11 +310,14 @@ function fire() {
     const sy = (Math.random() - 0.5) * 2 * W.spread * spreadK + (k === 0 ? ay : ay * 0.5), sp = (Math.random() - 0.5) * 2 * W.spread * spreadK * 0.7 + (k === 0 ? ap : ap * 0.5);
     const [dx, dy, dz] = aimDir(sy, sp); const r = hitscan(dx, dy, dz);
     if (r.hit) {
-      const dmg = W.dmg[0] + Math.random() * (W.dmg[1] - W.dmg[0]);
+      const dmg = (W.dmg[0] + Math.random() * (W.dmg[1] - W.dmg[0])) * (P.buff.power > 0 ? 2 : 1);
       const dist = r.t; const falloff = P.cur === 'shotgun' ? Math.max(0.25, 1 - dist / 22) : 1;
       const kill = G.enemies.hurt(r.hit.enemy, Math.round(dmg * falloff), r.hit.head);
       spawnFx(r.px, r.py, r.pz, 'blood', 3); hitAny = true; killedAny = killedAny || kill; headAny = headAny || !!r.hit.head;
-    } else { spawnFx(r.px, r.py, r.pz, 'spark', 3); spawnFx(r.px, r.py, r.pz, 'dust', 1); }
+    } else {
+      if (r.wall && G.traps && G.traps.shotAt(r.px, r.pz, (W.dmg[0] + W.dmg[1]) / 2 * (P.buff.power > 0 ? 2 : 1) * (P.cur === 'shotgun' ? 2.5 : 1))) hitAny = hitAny;
+      else { spawnFx(r.px, r.py, r.pz, 'spark', 3); spawnFx(r.px, r.py, r.pz, 'dust', 1); }
+    }
   }
   vm.fire(W); audio.sfx(P.cur); if (P.cur === 'shotgun') setTimeout(() => audio.sfx('pump'), 380);
   P.pitch += W.kick * 0.5 * (0.6 + Math.random() * 0.4); P.yaw += (Math.random() - 0.5) * W.kick * 0.3;
@@ -331,7 +360,7 @@ function meleeStrike() {
   for (const off of [-0.12, 0, 0.12]) {
     const [dx, dy, dz] = aimDir(off, 0), r = hitscan(dx, dy, dz, W.reach);
     if (r.hit && r.t <= W.reach) {
-      G.enemies.hurt(r.hit.enemy, Math.round(W.dmg[0] + Math.random() * (W.dmg[1] - W.dmg[0])), false); spawnFx(r.px, r.py, r.pz, 'blood', 4); hitSomething = true; break;
+      G.enemies.hurt(r.hit.enemy, Math.round((W.dmg[0] + Math.random() * (W.dmg[1] - W.dmg[0])) * (P.buff.power > 0 ? 2 : 1)), false); spawnFx(r.px, r.py, r.pz, 'blood', 4); hitSomething = true; break;
     }
   }
   if (hitSomething) { audio.sfx('knife_hit'); G.enemies.noise(P.x, P.z, 6); }
@@ -342,6 +371,9 @@ function collect(it) {
   switch (it.type) {
     case 'food': if (P.hp >= 100) return false; P.hp = Math.min(100, P.hp + 10); audio.sfx('health'); toast('補充體力 +10', 'good'); break;
     case 'medkit': if (P.hp >= 100) return false; P.hp = Math.min(100, P.hp + 25); audio.sfx('health'); toast('急救包 +25', 'good'); break;
+    case 'potion_speed': P.buff.speed = 12; audio.sfx('buff'); toast('加速藥水！跑更快 12 秒', 'good'); break;
+    case 'shield': P.buff.shield = 6; audio.sfx('buff'); toast('無敵護盾！6 秒不受傷', 'good'); break;
+    case 'power': P.buff.power = 15; audio.sfx('buff'); toast('雙倍傷害！15 秒', 'good'); break;
     case 'ammo': P.ammo.bullets = Math.min(250, P.ammo.bullets + 12); audio.sfx('pickup'); toast('子彈 +12'); break;
     case 'shells': P.ammo.shells = Math.min(60, P.ammo.shells + 6); audio.sfx('pickup'); toast('散彈 +6'); break;
     case 'armor': if (P.armor >= 100) return false; P.armor = Math.min(100, P.armor + 30); audio.sfx('pickup'); toast('護甲 +30', 'good'); break;
@@ -380,7 +412,7 @@ function updatePlayer(dt) {
   P.yaw += turn * 2.3 * dt;
   const fx = Math.sin(P.yaw), fz = -Math.cos(P.yaw), rx = Math.cos(P.yaw), rz = Math.sin(P.yaw);
   let wx = fx * fwd + rx * str, wz = fz * fwd + rz * str; const l = Math.hypot(wx, wz); if (l > 0) { wx /= l; wz /= l; }
-  const speed = 6.0, acc = l > 0 ? 14 : 12;
+  const speed = 6.0 * (P.buff.speed > 0 ? 1.45 : 1), acc = l > 0 ? 14 : 12;
   P.vx += (wx * speed - P.vx) * Math.min(1, acc * dt); P.vz += (wz * speed - P.vz) * Math.min(1, acc * dt);
   const before = [P.x, P.z];
   [P.x, P.z] = w.tryMove(P.x, P.z, P.vx * dt, P.vz * dt, 0.38);
@@ -725,7 +757,7 @@ function frame(now, dtOv) {
       if (P.meleeT > 0) { P.meleeT -= dt; if (P.meleeT <= 0) meleeStrike(); }
       if ((mouseDown) && (WEAPONS[P.cur].auto || !P.fireLatch)) { if (fire() && !WEAPONS[P.cur].auto) P.fireLatch = true; }
       if (!mouseDown) P.fireLatch = false;
-      updateItems(dt); updateHostage(dt);
+      updateItems(dt); updateHostage(dt); if (G.traps) G.traps.update(dt); updateBuffs(dt);
       updatePrompt();
       mapT -= dt; if (mapT <= 0) { mapT = 0.2; markSeen(); if (mapOn) drawMap(ui.mapc, false); }
       musicT -= dt;

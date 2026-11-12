@@ -76,6 +76,29 @@ export function buildItem(type, sub) {
       }
       glow = 0xffd060; scale = sub === 'chest' ? 1.2 : 1.5; break;
     }
+    case 'potion_speed': {
+      const glass = new THREE.MeshStandardMaterial({ color: 0x38b0ff, emissive: 0x104a78, transparent: true, opacity: 0.88, roughness: 0.12, metalness: 0.1 });
+      g.add(new THREE.Mesh(lathe([[0.001, 0], [0.16, 0], [0.21, 0.07], [0.21, 0.2], [0.11, 0.3], [0.065, 0.37], [0.065, 0.47], [0.001, 0.47]]), glass));
+      const cork = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.1, 10), plain(0x8a5a2a, 0.8)); cork.position.y = 0.52; g.add(cork);
+      const bolt = new THREE.Mesh(new THREE.OctahedronGeometry(0.07), new THREE.MeshBasicMaterial({ color: 0xf8f0a0 })); bolt.scale.set(0.7, 1.5, 0.5); bolt.position.set(0, 0.15, 0.2); g.add(bolt);
+      glow = 0x50c8ff; scale = 1.6; y = 0.9; break;
+    }
+    case 'shield': {
+      const sh = new THREE.Shape(); sh.moveTo(0, 0.4); sh.lineTo(0.27, 0.27); sh.lineTo(0.24, -0.08); sh.quadraticCurveTo(0.12, -0.32, 0, -0.42); sh.quadraticCurveTo(-0.12, -0.32, -0.24, -0.08); sh.lineTo(-0.27, 0.27); sh.closePath();
+      const geo = new THREE.ExtrudeGeometry(sh, { depth: 0.05, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.025, bevelSegments: 2 });
+      g.add(new THREE.Mesh(geo, metal(0xe8c040, 0.22)));
+      const inner = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 0.04, bevelEnabled: false }), new THREE.MeshStandardMaterial({ color: 0x2850c0, emissive: 0x0a1850, roughness: 0.4 }));
+      inner.scale.set(0.82, 0.82, 1); inner.position.set(0, 0.0, 0.065); g.add(inner);
+      const v = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.6, 0.02), metal(0xe8c040, 0.22)); v.position.set(0, 0, 0.11); g.add(v);
+      const h = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.07, 0.02), metal(0xe8c040, 0.22)); h.position.set(0, 0.12, 0.11); g.add(h);
+      g.position.y = 0.05; glow = 0xffe070; scale = 1.5; y = 1.0; break;
+    }
+    case 'power': {
+      const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.2), new THREE.MeshStandardMaterial({ color: 0xe02818, emissive: 0x801008, roughness: 0.2, metalness: 0.3 })); core.scale.y = 1.35; g.add(core);
+      const r1 = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.03, 8, 24), gold()); r1.rotation.x = Math.PI / 2.4; g.add(r1);
+      const r2 = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.03, 8, 24), gold()); r2.rotation.x = Math.PI / 2.4; r2.rotation.y = 1.5; g.add(r2);
+      glow = 0xff4830; scale = 1.55; y = 1.0; break;
+    }
     case 'key_gold': case 'key_silver': {
       const m = type === 'key_gold' ? metal(0xf0c040, 0.2) : metal(0xdce4f0, 0.18);
       const bow = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.035, 10, 20), m); bow.position.y = 0.3; g.add(bow);
@@ -109,5 +132,5 @@ export function buildItem(type, sub) {
 
 export const ITEM_NAME = {
   food: '食物', medkit: '急救包', ammo: '子彈', shells: '散彈', armor: '護甲', key_gold: '金鑰匙', key_silver: '銀鑰匙',
-  weapon_smg: '衝鋒槍', weapon_shotgun: '散彈槍', weapon_rifle: '步槍',
+  weapon_smg: '衝鋒槍', potion_speed: '加速藥水', shield: '無敵護盾', power: '雙倍傷害', weapon_shotgun: '散彈槍', weapon_rifle: '步槍',
 };

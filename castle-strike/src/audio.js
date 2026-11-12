@@ -337,6 +337,14 @@ export class AudioEngine {
       case 'door_open': { const g = sy.noise(t, 0.9, 0.2 * v, { type: 'bandpass', f0: 300, f1: 120, q: 3 }); sy.out(g, 0.2); sy.tone(t, 70, 0.8, 0.12 * v, 'sawtooth', { filter: 200, wet: 0.2 }); sy.tom(t + 0.8, 60, 0.3 * v); break; }
       case 'door_close': { const g = sy.noise(t, 0.5, 0.2 * v, { type: 'bandpass', f0: 250, f1: 100, q: 3 }); sy.out(g, 0.2); sy.tom(t + 0.45, 50, 0.5 * v); break; }
       case 'locked': { sy.tone(t, 220, 0.06, 0.2 * v, 'square', { wet: 0.05 }); sy.tone(t + 0.1, 180, 0.08, 0.2 * v, 'square', { wet: 0.05 }); break; }
+      case 'explode': { const g = sy.noise(t, 1.3, 0.95 * v, { type: 'lowpass', f0: 2200, f1: 70, q: 0.6 }); sy.out(g, x === undefined ? 0.3 : 0.2); sy.tone(t, 80, 0.7, 0.7 * v, 'sine', { wet: 0 }); sy.tom(t, 55, 0.7 * v); const g2 = sy.noise(t, 0.08, 0.6 * v, { type: 'highpass', f0: 2500 }); sy.out(g2, 0); break; }
+      case 'spike': { const g = sy.noise(t, 0.14, 0.4 * v, { type: 'bandpass', f0: 3200, f1: 1200, q: 1.5 }); sy.out(g, 0); sy.tone(t, 180, 0.07, 0.25 * v, 'square', { wet: 0 }); break; }
+      case 'flame_warn': { const g = sy.noise(t, 0.9, 0.18 * v, { type: 'bandpass', f0: 1800, f1: 3000, q: 1.2 }); sy.out(g, 0.1); break; }
+      case 'flame': { const g = sy.noise(t, 1.2, 0.5 * v, { type: 'bandpass', f0: 900, f1: 500, q: 0.8 }); sy.out(g, 0.15); sy.tone(t, 70, 1.1, 0.2 * v, 'sawtooth', { filter: 160, wet: 0.1 }); break; }
+      case 'creak': { sy.tone(t, 95, 0.9, 0.16 * v, 'sawtooth', { filter: 400, wet: 0.2 }); sy.tone(t + 0.15, 130, 0.7, 0.12 * v, 'square', { filter: 600, wet: 0.2 }); const g = sy.noise(t, 0.8, 0.12 * v, { type: 'bandpass', f0: 600, f1: 300, q: 4 }); sy.out(g, 0.2); break; }
+      case 'crash': { const g = sy.noise(t, 0.9, 0.8 * v, { type: 'lowpass', f0: 3500, f1: 200, q: 0.5 }); sy.out(g, 0.3); sy.tom(t, 70, 0.6 * v); [0, 0.05, 0.11, 0.2].forEach((d, i) => sy.fm(t + d, mtof(100 - i * 6), 0.3, 0.12 * v, { ratio: 3.7, index: 1.5, decay: 0.2, wet: 0.3 })); break; }
+      case 'buff': [0, 1, 2, 3].forEach((i) => sy.fm(t + i * 0.06, mtof(72 + [0, 4, 7, 12][i]), 0.3, 0.17 * v, { ratio: 2, index: 1, decay: 0.2, wet: 0.35 })); break;
+      case 'shield_hit': { sy.fm(t, mtof(96), 0.2, 0.2 * v, { ratio: 3, index: 1.2, decay: 0.12, wet: 0.3 }); break; }
       case 'push': { const g = sy.noise(t, 1.4, 0.35 * v, { type: 'lowpass', f0: 400, f1: 100 }); sy.out(g, 0.3); sy.tone(t, 45, 1.4, 0.25 * v, 'sawtooth', { filter: 120, wet: 0.2 }); break; }
       case 'secret': [0, 1, 2, 3, 4].forEach((i) => sy.fm(t + i * 0.08, mtof(72 + [0, 4, 7, 12, 16][i]), 0.3, 0.14 * v, { ratio: 3.5, index: 1, decay: 0.2, wet: 0.4 })); break;
       case 'pickup': sy.fm(t, mtof(79), 0.1, 0.18 * v, { ratio: 2, index: 1.2, decay: 0.1, wet: 0.2 }); sy.fm(t + 0.07, mtof(86), 0.2, 0.18 * v, { ratio: 2, index: 1.2, decay: 0.15, wet: 0.3 }); break;

@@ -11,7 +11,7 @@ export function mulberry32(a) {
 export const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]]; // 0:+x 1:-x 2:+z 3:-z
 
 export const LEVELS = [
-  { name: '城門庭園', size: 38, rooms: 8, minRoom: 5, maxW: 10, maxH: 8, gates: 1, dens: 24, theme: 'courtyard', seed: 1101,
+  { name: '城門庭園', size: 38, rooms: 8, minRoom: 5, maxW: 10, maxH: 8, gates: 1, dens: 24, theme: 'courtyard', trap: 0.3, seed: 1101,
     foes: { guard: 80, dog: 20 }, weapon: 'smg' },
   { name: '迎賓大廳', size: 44, rooms: 10, minRoom: 5, maxW: 11, maxH: 9, gates: 2, dens: 20, theme: 'hall', seed: 2202,
     foes: { guard: 58, dog: 14, officer: 28 }, weapon: 'shotgun' },
@@ -460,6 +460,42 @@ function gen(index, seed) {
     }
     level.enemies.push({ type: 'boss', gx: bx, gz: bz, angle: Math.atan2(last.cz - bz, last.cx - bx), boss: true });
     take(bx, bz);
+  }
+
+  // 機關陷阱與新道具（獨立亂數，不影響既有配置）
+  level.traps = [];
+  {
+    const r2 = mulberry32(seed + 4242), dens = cfg.trap ?? 0.6;
+    const ecell = new Set(level.enemies.map((e) => idx(W, e.gx, e.gz)));
+    const ok = (x, z) => free(x, z) && !front.has(idx(W, x, z)) && !ecell.has(idx(W, x, z));
+    const pickc = (r) => { for (let t = 0; t < 40; t++) { const x = r.x + Math.floor(r2() * r.w), z = r.z + Math.floor(r2() * r.h); if (ok(x, z)) return [x, z]; } return null; };
+    const WD = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (const r of rooms) {
+      if (r === sr) continue;
+      const area = r.w * r.h;
+      const n = (r2() < dens ? 1 : 0) + (area > 60 && r2() < dens * 0.7 ? 1 : 0);
+      for (let k = 0; k < n; k++) {
+        const roll = r2();
+        if (roll < 0.3) {
+          const c = pickc(r); if (c) { level.traps.push({ type: 'spike', gx: c[0], gz: c[1], ph: r2() * 4 }); take(c[0], c[1]); }
+        } else if (roll < 0.6) {
+          const c = pickc(r); if (c) { level.traps.push({ type: 'barrel', gx: c[0], gz: c[1], n: 2 + (r2() < 0.5 ? 1 : 0) }); take(c[0], c[1]); }
+        } else if (roll < 0.82) {
+          const cand = [];
+          for (let z = r.z; z < r.z + r.h; z++) for (let x = r.x; x < r.x + r.w; x++) {
+            if (!ok(x, z)) continue;
+            for (const [dx, dz] of WD) { const wi = idx(W, x + dx, z + dz); if (cells[wi] === 1 && roomId[wi] < 0) cand.push([x, z, dx, dz]); }
+          }
+          if (cand.length) { const c = cand[Math.floor(r2() * cand.length)]; level.traps.push({ type: 'flame', gx: c[0], gz: c[1], wx: c[2], wz: c[3], ph: r2() * 5 }); take(c[0], c[1]); }
+        } else if (area >= 30) {
+          const c = ok(r.cx, r.cz) ? [r.cx, r.cz] : pickc(r); if (c) { level.traps.push({ type: 'chandelier', gx: c[0], gz: c[1] }); take(c[0], c[1]); }
+        }
+      }
+      if (r2() < 0.3) {
+        const c = pickc(r);
+        if (c) { level.items.push({ type: ['potion_speed', 'shield', 'power'][Math.floor(r2() * 3)], gx: c[0], gz: c[1] }); take(c[0], c[1]); }
+      }
+    }
   }
 
   // 啟動資訊
