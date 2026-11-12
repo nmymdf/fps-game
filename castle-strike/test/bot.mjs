@@ -41,6 +41,7 @@ for (let L = startL; L <= endL; L++) {
         }
       }
     };
+    if (G.timeLeft != null) G.timeLeft = 1e9;
     const log = [];
     // 收集所有鑰匙 + 寶物 (走過去)
     let safety = 0;
@@ -58,6 +59,7 @@ for (let L = startL; L <= endL; L++) {
     const items2 = G.items.filter((it) => !it.taken && it.type === 'treasure').length;
     // 殺光敵人（測試統計用）
     for (const e of G.enemies.list) if (!e.dead) G.enemies.hurt(e, 99999, false);
+    if (G.wave) G.wave.done = true;
     for (let i = 0; i < 20; i++) step(0.05);
     let hostInfo = null;
     if (G.hostage) {

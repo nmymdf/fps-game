@@ -10,6 +10,10 @@ export function mulberry32(a) {
 
 export const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]]; // 0:+x 1:-x 2:+z 3:-z
 
+export const DEFENSE_WAVES = [
+  { guard: 6, dog: 2 }, { guard: 6, officer: 4, dog: 3 }, { guard: 5, officer: 6, heavy: 3 }, { guard: 6, officer: 6, heavy: 5, dog: 4 },
+];
+
 export const LEVELS = [
   { name: '城門庭園', size: 38, rooms: 8, minRoom: 5, maxW: 10, maxH: 8, gates: 1, dens: 24, theme: 'courtyard', trap: 0.3, seed: 1101,
     foes: { guard: 80, dog: 20 }, weapon: 'smg' },
@@ -17,14 +21,20 @@ export const LEVELS = [
     foes: { guard: 58, dog: 14, officer: 28 }, weapon: 'shotgun' },
   { name: '藏書閣', size: 46, rooms: 11, minRoom: 5, maxW: 11, maxH: 9, gates: 2, dens: 18, theme: 'library', seed: 3303,
     foes: { guard: 42, dog: 18, officer: 40 }, weapon: 'rifle' },
+  { name: '夜襲潛行', size: 46, rooms: 11, minRoom: 5, maxW: 11, maxH: 9, gates: 1, dens: 26, theme: 'courtyard', mode: 'sneak', trap: 0.3, seed: 1717,
+    foes: { guard: 70, officer: 30 }, weapon: null },
   { name: '地下酒窖', size: 48, rooms: 12, minRoom: 5, maxW: 11, maxH: 9, gates: 2, dens: 16, theme: 'cellar', hostage: true, seed: 4404,
     foes: { guard: 34, dog: 16, officer: 28, heavy: 22 }, weapon: null },
   { name: '禮拜塔', size: 48, rooms: 12, minRoom: 5, maxW: 11, maxH: 9, gates: 2, dens: 15, theme: 'chapel', seed: 5505,
     foes: { guard: 26, dog: 14, officer: 30, heavy: 30 }, weapon: null },
+  { name: '限時逃脫', size: 52, rooms: 13, minRoom: 5, maxW: 11, maxH: 9, gates: 1, dens: 40, theme: 'hall', mode: 'escape', trap: 1.0, seed: 2929,
+    foes: { guard: 60, dog: 20, officer: 20 }, weapon: null },
   { name: '城牆哨塔', size: 50, rooms: 12, minRoom: 5, maxW: 11, maxH: 9, gates: 2, dens: 14, theme: 'courtyard', seed: 7707,
     foes: { guard: 30, dog: 16, officer: 30, heavy: 24 }, weapon: null },
   { name: '軍械地牢', size: 52, rooms: 13, minRoom: 5, maxW: 11, maxH: 9, gates: 2, dens: 13, theme: 'cellar', seed: 8808,
     foes: { guard: 22, dog: 14, officer: 28, heavy: 36 }, weapon: null },
+  { name: '守城之夜', size: 42, rooms: 8, minRoom: 6, maxW: 12, maxH: 10, gates: 0, dens: 20, theme: 'chapel', mode: 'defense', noFoes: true, trap: 0.4, seed: 3131,
+    foes: { guard: 1 }, weapon: null },
   { name: '貴賓長廊', size: 50, rooms: 12, minRoom: 5, maxW: 12, maxH: 9, gates: 2, dens: 13, theme: 'hall', hostage: true, seed: 9909,
     foes: { guard: 24, dog: 12, officer: 38, heavy: 26 }, weapon: null },
   { name: '皇家藏經室', size: 52, rooms: 13, minRoom: 5, maxW: 11, maxH: 9, gates: 2, dens: 12, theme: 'library', seed: 1313,
@@ -406,6 +416,7 @@ function gen(index, seed) {
   }
   // 起點房補給
   place('ammo', sr); place('food', sr);
+  if (cfg.mode === 'defense') { for (let k = 0; k < 3; k++) place('ammo', sr); for (let k = 0; k < 2; k++) { place('shells', sr); place('medkit', sr); } place('armor', sr); place('armor', sr); }
   // 人質
   if (cfg.hostage) {
     const cand = rooms.filter((r) => r !== sr).sort((a, b) => Math.hypot(b.x - sr.x, b.z - sr.z) - Math.hypot(a.x - sr.x, a.z - sr.z));
@@ -427,7 +438,7 @@ function gen(index, seed) {
   for (const r of rooms) {
     const area = r.w * r.h;
     let count = Math.max(1, Math.round(area / cfg.dens));
-    if (r === sr) count = 0;
+    if (r === sr || cfg.noFoes) count = 0;
     if (r === chain[1] && index === 0) count = Math.min(count, 2);
     if (r === last && cfg.boss) count = Math.max(count, 5);
     for (let k = 0; k < count; k++) {
@@ -443,7 +454,7 @@ function gen(index, seed) {
   // 走廊守衛
   let cg = 0;
   for (const c of connections) {
-    if (cg >= 3 + index) break;
+    if (cfg.noFoes || cg >= 3 + index) break;
     const cand = c.path.filter(([x, z]) => roomId[idx(W, x, z)] < 0 && !doors.has(idx(W, x, z)) && free(x, z) && Math.abs(x - sr.cx) + Math.abs(z - sr.cz) > 12);
     if (cand.length > 6 && rnd() < 0.6) {
       const [x, z] = cand[ri(2, cand.length - 3)];
@@ -491,6 +502,7 @@ function gen(index, seed) {
           const c = ok(r.cx, r.cz) ? [r.cx, r.cz] : pickc(r); if (c) { level.traps.push({ type: 'chandelier', gx: c[0], gz: c[1] }); take(c[0], c[1]); }
         }
       }
+      if (cfg.mode === 'escape' && r2() < 0.6) { const c = pickc(r); if (c) { level.items.push({ type: 'clock', gx: c[0], gz: c[1] }); take(c[0], c[1]); } }
       if (r2() < 0.3) {
         const c = pickc(r);
         if (c) { level.items.push({ type: ['potion_speed', 'shield', 'power'][Math.floor(r2() * 3)], gx: c[0], gz: c[1] }); take(c[0], c[1]); }
@@ -501,6 +513,15 @@ function gen(index, seed) {
   // 啟動資訊
   level.start.angle = Math.atan2(chain[1].cz - sr.cz, chain[1].cx - sr.cx);
   level.enemyCount = level.enemies.length;
+  if (cfg.mode === 'defense') {
+    level.enemyCount = DEFENSE_WAVES.reduce((a, w) => a + Object.values(w).reduce((x, y) => x + y, 0), 0);
+    const r3 = mulberry32(seed + 5151); level.spawns = [];
+    for (const r of rooms) {
+      if (r === sr) continue;
+      for (let t = 0; t < 14; t++) { const x = r.x + Math.floor(r3() * r.w), z = r.z + Math.floor(r3() * r.h); if (cells[idx(W, x, z)] === 0 && Math.abs(x - sr.cx) + Math.abs(z - sr.cz) > 10) { level.spawns.push([x, z]); if (t > 4) break; } }
+    }
+    if (level.spawns.length < 6) return null;
+  }
   level.connections = connections;
   return level;
 }

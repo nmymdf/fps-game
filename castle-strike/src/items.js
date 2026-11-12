@@ -99,6 +99,14 @@ export function buildItem(type, sub) {
       const r2 = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.03, 8, 24), gold()); r2.rotation.x = Math.PI / 2.4; r2.rotation.y = 1.5; g.add(r2);
       glow = 0xff4830; scale = 1.55; y = 1.0; break;
     }
+    case 'clock': {
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.04, 10, 28), gold()); g.add(rim);
+      const face = new THREE.Mesh(new THREE.CircleGeometry(0.26, 28), plain(0xf4efe0, 0.4)); face.position.z = -0.005; g.add(face);
+      const hh = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.18, 0.02), plain(0x201810, 0.5)); hh.position.set(0, 0.07, 0.02); g.add(hh);
+      const mh = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.13, 0.02), plain(0x201810, 0.5)); mh.rotation.z = -1.1; mh.position.set(0.05, 0.02, 0.02); g.add(mh);
+      const bell = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), gold()); bell.position.y = 0.32; g.add(bell);
+      glow = 0xffe8a0; scale = 1.55; y = 1.0; break;
+    }
     case 'key_gold': case 'key_silver': {
       const m = type === 'key_gold' ? metal(0xf0c040, 0.2) : metal(0xdce4f0, 0.18);
       const bow = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.035, 10, 20), m); bow.position.y = 0.3; g.add(bow);
@@ -132,5 +140,5 @@ export function buildItem(type, sub) {
 
 export const ITEM_NAME = {
   food: '食物', medkit: '急救包', ammo: '子彈', shells: '散彈', armor: '護甲', key_gold: '金鑰匙', key_silver: '銀鑰匙',
-  weapon_smg: '衝鋒槍', potion_speed: '加速藥水', shield: '無敵護盾', power: '雙倍傷害', weapon_shotgun: '散彈槍', weapon_rifle: '步槍',
+  weapon_smg: '衝鋒槍', potion_speed: '加速藥水', clock: '時鐘', shield: '無敵護盾', power: '雙倍傷害', weapon_shotgun: '散彈槍', weapon_rifle: '步槍',
 };

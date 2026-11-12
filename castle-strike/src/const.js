@@ -1,7 +1,7 @@
 export const CELL = 3;
 export const WALL_H = 3.2;
 export const EYE = 1.62;
-export const VERSION = 'v2.4';
+export const VERSION = 'v2.5';
 export const TITLE = '城堡突襲';
 export const AUTHOR = '作者：ArchieKUO';
 

@@ -1,0 +1,18 @@
+import { chromium } from 'playwright-core';
+const b = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true, args: ['--use-angle=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist','--enable-webgl','--no-sandbox','--allow-file-access-from-files'] });
+const p = await b.newPage({ viewport: { width: 960, height: 540 } });
+p.on('pageerror', e => console.log('ERR', e.message));
+await p.goto('file:///home/claude/castle-strike/dist/index.html'); await p.waitForTimeout(2000);
+const load = async (L) => { await p.evaluate((L) => { __g.G.manual = true; __g.newGame(L, 0); }, L); await p.waitForFunction(() => __g.G.mode === 'playing', null, { timeout: 120000 }); };
+await load(6);
+console.log('escape', JSON.stringify(await p.evaluate(() => { const g=__g,G=g.G; g.step(0.05); return { t:G.timeLeft.toFixed(0), clocks:G.lv.items.filter(i=>i.type==='clock').length, traps:G.lv.traps.length, hud:document.getElementById('modehud').textContent }; })));
+await p.screenshot({ path: '/tmp/m_esc.png' });
+console.log('timeout', await p.evaluate(() => { const g=__g,G=g.G; G.timeLeft=0.1; for(let i=0;i<6;i++) g.step(0.05); return G.mode; }));
+await load(3);
+console.log('sneak1', JSON.stringify(await p.evaluate(() => { const g=__g,G=g.G,P=g.P; g.step(0.05);
+  const e=G.enemies.list.find(e=>!e.dead&&e.type==='guard'); e.state='idle'; e.x=P.x+Math.sin(P.yaw)*1.0; e.z=P.z-Math.cos(P.yaw)*1.0; e.face=P.yaw;
+  return { st:e.state, hud:document.getElementById('modehud').textContent, hasMelee: !!g.melee }; })));
+await p.screenshot({ path: '/tmp/m_sneak.png' });
+console.log('alarm', JSON.stringify(await p.evaluate(() => { const g=__g,G=g.G; const e=G.enemies.list.find(e=>!e.dead&&e.state==='idle'); G.enemies.wake(e,0.1); for(let i=0;i<4;i++) g.step(0.05); return { alarm:G.alarm, hud:document.getElementById('modehud').textContent, chasing:G.enemies.list.filter(e=>!e.dead&&(e.state==='chase'||e.state==='alert')).length }; })));
+await p.screenshot({ path: '/tmp/m_alarm.png' });
+await b.close();

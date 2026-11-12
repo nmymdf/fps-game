@@ -67,12 +67,32 @@ const CSS = `
 #cross.hit i,#cross.hit b{background:#ff5040}#cross.hit{transform:scale(1.5)}
 #cross.kill i,#cross.kill b{background:#ff2a1a;box-shadow:0 0 8px #f00,0 0 3px #000}#cross.kill{transform:scale(2.1) rotate(45deg)}
 #cross.head i,#cross.head b{background:#ffd23a}
-#toasts{position:absolute;left:2vw;top:2.5vh;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+#toasts{position:absolute;left:2vw;top:9vh;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
 .toast{font-size:clamp(22px,3.4vh,38px);font-weight:700;padding:6px 16px;background:rgba(10,8,6,.62);border-left:5px solid #e8c25a;border-radius:3px;text-shadow:0 2px 4px #000;animation:tin .25s ease-out;transition:opacity .5s}
 .toast.bad{border-color:#ff5a4a}.toast.good{border-color:#7ae27a}
 @keyframes tin{from{transform:translateX(-30px);opacity:0}}
 #prompt{position:absolute;left:0;right:0;bottom:calc(clamp(96px,15vh,170px) + 4vh);text-align:center;font-size:clamp(26px,4.2vh,46px);font-weight:700;text-shadow:0 2px 8px #000,0 0 18px #000;opacity:0;transition:opacity .15s}
 #prompt.on{opacity:1}
+#modehud{position:absolute;left:25%;right:25%;top:2.5vh;text-align:center;font-size:clamp(30px,5.2vh,60px);font-weight:900;letter-spacing:.05em;text-shadow:0 2px 6px #000,0 0 14px rgba(0,0,0,.8);opacity:0;transition:opacity .3s;color:#fff;font-variant-numeric:tabular-nums}
+#modehud.on{opacity:1}#modehud.red{color:#ff5a4a}#modehud.green{color:#8ae88a}#modehud.gold{color:#ffd870}
+#modehud.pulse{animation:mp .5s infinite alternate}@keyframes mp{from{opacity:1}to{opacity:.45}}
+body.boss-on #modehud{top:9vh}
+#alarmfx{position:absolute;inset:0;pointer-events:none;opacity:0;box-shadow:inset 0 0 14vh 3vh rgba(255,30,20,.6)}
+#alarmfx.on{animation:af .7s infinite alternate}@keyframes af{from{opacity:.15}to{opacity:1}}
+#s-shop .panel{min-width:72vw;max-width:94vw;padding:1.6vh 2.4vw}#s-shop h2{margin:0 0 .6vh;font-size:clamp(30px,5vh,56px)}
+.coins{font-size:clamp(24px,3.8vh,44px);color:#ffd870;margin-bottom:.6vh;display:flex;justify-content:space-between}
+.coins b{font-variant-numeric:tabular-nums;color:#fff}
+.srow{display:grid;grid-template-columns:3.2vh 1fr 12vw;gap:2vw;align-items:center;text-align:left;font-size:clamp(22px,3.4vh,40px);padding:.45vh 1vw;border-bottom:1px solid rgba(214,170,70,.2);cursor:pointer;border-left:6px solid transparent}
+.srow.cur{background:rgba(214,170,70,.14);border-left-color:#e8c25a}
+.srow .chk{width:3.2vh;height:3.2vh;border:3px solid #e8c25a;border-radius:6px;display:inline-block;position:relative}
+.srow.on .chk::after{content:'';position:absolute;left:30%;top:6%;width:26%;height:56%;border:solid #7ae27a;border-width:0 5px 5px 0;transform:rotate(45deg)}
+.srow .nm small{display:inline;margin-left:1.2vw;font-size:.62em;color:#c8b890}
+.srow .pr{text-align:right;font-variant-numeric:tabular-nums;font-weight:800;color:#fff}
+.srow.no .pr{color:#ff6a5a}.srow.max{opacity:.45;cursor:default}
+.sbar{display:flex;justify-content:space-between;align-items:center;margin-top:1.2vh;gap:2vw}
+.sbar .tot{font-size:clamp(24px,3.8vh,44px);color:#ffd870;font-variant-numeric:tabular-nums}
+.sbtn{font-size:clamp(24px,3.8vh,44px);font-weight:800;padding:.7vh 2vw;border:3px solid #e8c25a;border-radius:10px;background:rgba(0,0,0,.55);color:#ffe8a0;cursor:pointer;font-family:inherit}
+.sbtn:hover{background:rgba(214,170,70,.25)}
 #buffs{position:absolute;left:2vw;bottom:calc(clamp(96px,15vh,170px) + 3vh);display:flex;flex-direction:column;gap:8px;align-items:flex-start}
 .buff{display:flex;align-items:center;gap:12px;font-size:clamp(24px,3.8vh,44px);font-weight:800;padding:4px 18px;background:rgba(10,8,6,.7);border-left:6px solid #fff;border-radius:4px;color:#fff}
 .buff span{font-variant-numeric:tabular-nums;min-width:1.6em;text-align:right}
@@ -136,6 +156,8 @@ export function mountUI() {
   <div id="wlist"></div>
   <div id="prompt"></div>
   <div id="buffs"></div>
+  <div id="modehud"></div>
+  <div id="alarmfx"></div>
   <div id="shieldfx"></div>
   <div id="gun2d">${gunHtml()}</div>
   <div class="hud" id="hud">
@@ -179,6 +201,12 @@ export function mountUI() {
     <div class="menu" style="margin-top:1.2vh" id="m-pause"></div>
     <div style="margin-top:2.5vh"><span class="sig" style="font-size:clamp(18px,2.8vh,30px)">${AUTHOR}　${VERSION}</span></div></div></div>
   <div class="screen dim" id="s-sum"><div class="panel"><h2 id="sum-t">本關完成</h2><div id="sum-rows"></div><div class="hint" id="sum-h">按 Enter 繼續</div><div style="margin-top:2.5vh"><span class="sig" style="font-size:clamp(18px,2.8vh,30px)">${AUTHOR}　${VERSION}</span></div></div></div>
+  <div class="screen dim" id="s-shop"><div class="panel"><h2>軍需商店</h2>
+    <div class="coins"><span>金幣</span><b id="shop-coins">0</b></div>
+    <div id="shop-rows"></div>
+    <div class="sbar"><span class="tot" id="shop-tot">已選 0 項　合計 0</span><span><button class="sbtn" id="shop-buy">購買所選</button>　<button class="sbtn" id="shop-go">前往下一關</button></span></div>
+    <div class="hint" style="margin-top:.8vh;font-size:clamp(18px,2.6vh,30px)">↑↓ 移動　空白鍵 勾選　Enter 購買所選（沒勾選時前往下一關）</div>
+    <div style="margin-top:.6vh"><span class="sig" style="font-size:clamp(18px,2.6vh,30px)">${AUTHOR}　${VERSION}</span></div></div></div>
   <div class="screen" id="s-dead" style="background:radial-gradient(ellipse at center,rgba(90,0,0,.5),rgba(20,0,0,.92))"><div class="big" style="color:#ff5a4a" id="dead-t">你倒下了</div><div class="sub" id="dead-s" style="margin-top:2vh"></div><div class="menu" style="margin-top:5vh" id="m-dead"></div></div>
   <div class="screen dim" id="s-win"><div class="title" style="font-size:clamp(50px,12vh,140px)">大獲全勝</div><div class="sub" style="margin-bottom:3vh">城堡已經收復</div><div class="panel" style="padding:2vh 3vw"><div id="win-rows"></div></div><div class="menu" style="margin-top:3vh" id="m-win"></div><div class="foot"><span class="sig">${AUTHOR}　${VERSION}</span></div></div>
   <div class="screen dim" id="s-load"><div class="title" style="font-size:clamp(40px,8vh,90px)" id="load-t">準備中…</div><div class="sub" id="load-s" style="margin-bottom:3vh">城堡正在建造</div><div style="width:50vw;height:clamp(18px,3vh,30px);border:2px solid #d9ae3c;border-radius:6px;background:rgba(0,0,0,.6);overflow:hidden"><div id="load-b" style="height:100%;width:0;background:linear-gradient(180deg,#f0cf74,#a07a1c);transition:width .15s"></div></div><div class="hint" id="load-h" style="margin-top:3vh">請稍等幾秒鐘</div><div class="foot"><span class="sig">${AUTHOR}　${VERSION}</span></div></div>

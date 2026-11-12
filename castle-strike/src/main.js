@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createEngine } from './engine.js';
-import { generateLevel, LEVELS } from './levelgen.js';
+import { generateLevel, LEVELS, DEFENSE_WAVES } from './levelgen.js';
 import { World } from './world.js';
 import { Enemies, TYPES } from './enemies.js';
 import { ViewModel, WEAPONS, WEAPON_ORDER } from './weapons.js';
@@ -24,7 +24,7 @@ const ui = mountUI(); const $ = ui.$;
 const canvas = document.getElementById('c');
 const eng = createEngine(canvas, settings.quality);
 const { scene, camera } = eng;
-const MUSIC_FOR = [0, 1, 2, 3, 4, 2, 3, 1, 4, 5]; // 每一關配哪一段音樂
+const MUSIC_FOR = [0, 1, 2, 3, 3, 4, 5, 2, 3, 4, 1, 4, 5]; // 每一關配哪一段音樂
 const audio = new AudioEngine();
 function applyVol() { audio.setVolumes(settings.musicOn ? settings.music / 100 * 1.1 : 0, settings.sfx / 100); }
 applyVol();
@@ -86,7 +86,8 @@ function toast(msg, cls = '') {
 
 // ======================= 關卡載入 =======================
 const newBuff = () => ({ speed: 0, shield: 0, power: 0 });
-P.buff = newBuff();
+P.buff = newBuff(); P.coins = 0; P.upg = { dmg: 0, run: 0 };
+const dmgMul = () => (1 + 0.15 * P.upg.dmg) * (P.buff.power > 0 ? 2 : 1);
 function disposeWorld() {
   if (G.enemies) G.enemies.dispose();
   for (const it of G.items) scene.remove(it.obj);
@@ -135,12 +136,88 @@ function populate(fresh) {
   G.kills = 0; G.treasure = 0; G.secrets = 0; G.levelTime = 0; G.bossDead = false; G.winT = 0; G.deadT = 0;
   G.enemies = new Enemies(scene, w, lv, enemyCtx);
   for (const e of G.enemies.list) { enableShadows(e.group); e.blob.visible = false; }
-  spawnHostage(lv);
+  spawnHostage(lv); initMode();
   for (const it of lv.items) addItem(it.type, (it.gx + 0.5) * CELL, (it.gz + 0.5) * CELL, it.sub);
   if (G.mode !== 'title') {
     vm.show(P.cur); vm.next = null; vm.switchT = 1;
   }
   refreshWeaponList();
+}
+// ======================= 特殊關卡 =======================
+const modeEl = () => $('modehud');
+function setModeHud(text, cls = '') { const el = modeEl(); if (!el) return; el.textContent = text; el.className = text ? ('on ' + cls).trim() : ''; }
+function pathCells(a, b) {
+  const W = G.world, Wd = W.W, prev = new Map(), q = [a]; prev.set(a[1] * Wd + a[0], -1);
+  for (let i = 0; i < q.length; i++) {
+    const [x, z] = q[i]; if (x === b[0] && z === b[1]) { let n = 0, k = z * Wd + x; while (k !== -1) { n++; k = prev.get(k); } return n; }
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, nz = z + dz; if (!W.inb(nx, nz)) continue; const j = nz * Wd + nx; if (prev.has(j) || W.cells[j] !== 0) continue; prev.set(j, z * Wd + x); q.push([nx, nz]); }
+  }
+  return 0;
+}
+function initMode() {
+  const lv = G.lv, m = lv.cfg.mode; G.alarm = false; G.alarmT = 0; G.timeLeft = null; G.wave = null; setModeHud(''); $('alarmfx').classList.remove('on');
+  if (m === 'sneak') { setModeHud('潛行中', 'green'); setTimeout(() => toast('潛行任務：別被發現！小刀能無聲暗殺沒發現你的敵人'), 1500); }
+  else if (m === 'escape') {
+    const DR = [[1, 0], [-1, 0], [0, 1], [0, -1]], ex = lv.exit, fx = ex.x + DR[ex.d][0], fz = ex.z + DR[ex.d][1];
+    const pts = [[lv.start.x, lv.start.z]];
+    for (const t of ['key_gold', 'key_silver']) { const k = lv.items.find((it) => it.type === t); if (k) pts.push([k.gx, k.gz]); }
+    pts.push([fx, fz]); let len = 0; for (let i = 1; i < pts.length; i++) len += pathCells(pts[i - 1], pts[i]);
+    G.timeLeft = Math.round(len * CELL / 6 * 2.4 + 40);
+    setTimeout(() => toast('限時逃脫！倒數結束前跑到出口，路上有時鐘可加時間'), 1500);
+  } else if (m === 'defense') {
+    G.wave = { n: 0, state: 'prep', t: 15, done: false };
+    setTimeout(() => toast('守住這個房間！撐過 4 波敵人，出口才會打開'), 1500);
+  }
+}
+function triggerAlarm() {
+  if (G.alarm || G.mode !== 'playing') return; G.alarm = true; G.alarmT = 6;
+  setModeHud('警報響起！', 'red pulse'); $('alarmfx').classList.add('on'); audio.sfx('alarm'); toast('警報響起！全城的敵人都來了', 'bad');
+  for (const e of G.enemies.list) if (!e.dead && (e.state === 'idle' || e.state === 'alert')) { e.state = 'chase'; e.react = 0; }
+}
+function exitBlock() {
+  if (G.hostage && !G.hostage.freed) return '還有人質沒救出來！';
+  if (G.wave && !G.wave.done) return '先守住所有波次！';
+  return '';
+}
+const WAVE_ORDER = ['guard', 'dog', 'officer', 'heavy'];
+function startWave() {
+  const W = G.world, spec = DEFENSE_WAVES[G.wave.n], sp = G.lv.spawns;
+  for (const type of WAVE_ORDER) for (let k = 0; k < (spec[type] || 0); k++) {
+    let pos = null;
+    for (let t = 0; t < 14; t++) {
+      const c = sp[Math.floor(Math.random() * sp.length)], x = (c[0] + 0.5) * CELL, z = (c[1] + 0.5) * CELL;
+      if (Math.hypot(x - P.x, z - P.z) > 14 && (!W.los(x, z, P.x, P.z) || t > 9)) { pos = [x + (Math.random() - 0.5) * 1.2, z + (Math.random() - 0.5) * 1.2]; break; }
+    }
+    if (!pos) { const c = sp[Math.floor(Math.random() * sp.length)]; pos = [(c[0] + 0.5) * CELL, (c[1] + 0.5) * CELL]; }
+    const e = G.enemies.spawn(type, pos[0], pos[1]); enableShadows(e.group); e.blob.visible = false;
+  }
+  G.wave.state = 'fight'; audio.sfx('wave'); toast(`第 ${G.wave.n + 1} 波來襲！`, 'bad');
+}
+let tickLast = -1;
+function updateMode(dt) {
+  const lv = G.lv, m = lv.cfg.mode; if (!m) return;
+  if (m === 'sneak') {
+    if (G.alarm) { G.alarmT -= dt; if (G.alarmT > 0 && Math.floor(G.alarmT * 0.75) !== Math.floor((G.alarmT + dt) * 0.75)) audio.sfx('alarm'); }
+  } else if (m === 'escape' && G.timeLeft != null) {
+    G.timeLeft -= dt; const t = Math.max(0, G.timeLeft), sec = Math.ceil(t);
+    setModeHud(`逃脫倒數 ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`, t < 30 ? 'red pulse' : t < 60 ? 'gold' : '');
+    if (t < 15 && sec !== tickLast) { tickLast = sec; audio.sfx('tick'); }
+    if (t <= 0 && P.alive) { G.timeLeft = 0; toast('時間到！城堡爆炸了……', 'bad'); audio.sfx('explode'); P.hp = 0; die(); }
+  } else if (m === 'defense' && G.wave) {
+    const w = G.wave, total = DEFENSE_WAVES.length;
+    if (w.done) { setModeHud('防線守住了！前往出口', 'green'); return; }
+    if (w.state === 'prep') {
+      w.t -= dt; setModeHud(`第 ${w.n + 1} / ${total} 波　${Math.ceil(w.t)} 秒後來襲`, 'gold');
+      if (w.t <= 0) startWave();
+    } else {
+      const alive = G.enemies.list.filter((e) => e.wave && !e.dead).length;
+      setModeHud(`第 ${w.n + 1} / ${total} 波　剩餘敵人 ${alive}`, 'red');
+      if (alive === 0) {
+        if (w.n + 1 >= total) { w.done = true; audio.sfx('secret'); toast('防線守住了！出口已開啟', 'good'); }
+        else { w.n++; w.state = 'prep'; w.t = 10; toast('補充彈藥！下一波 10 秒後來襲', 'good'); }
+      }
+    }
+  }
 }
 function spawnHostage(lv) {
   if (G.hostage && G.hostage.sp) scene.remove(G.hostage.sp);
@@ -155,7 +232,7 @@ function spawnHostage(lv) {
 }
 function freeHostage() {
   const h = G.hostage; if (!h || h.freed) return;
-  h.freed = true; h.t = 0; P.score += 3000; P.hp = Math.min(100, P.hp + 30);
+  h.freed = true; h.t = 0; P.score += 3000; P.coins += 3000; P.hp = Math.min(100, P.hp + 30);
   audio.sfx('secret'); toast('人質獲救！ +3000　體力 +30', 'good'); P.flash = 0.5; P.mood = 'grin'; P.moodT = 1.5;
 }
 const buffEl = { speed: null, shield: null, power: null }, buffLast = { speed: -1, shield: -1, power: -1 };
@@ -214,6 +291,7 @@ const enemyCtx = {
   sfx: (n, x, z) => audio.sfx(n, x, z),
   hitPlayer: (dmg, fx, fz) => damagePlayer(dmg, fx, fz),
   onBossPhase: (ph) => { toast(ph === 2 ? '統領發怒了！援軍趕到！' : '統領瘋狂了！最後援軍！', 'bad'); audio.sfx('locked'); },
+  onWake: () => { if (G.lv && G.lv.cfg.mode === 'sneak') triggerAlarm(); },
   onKill: (e) => {
     if (!e.summoned) G.kills++; P.score += e.T.score;
     P.mood = 'grin'; P.moodT = 0.9;
@@ -310,12 +388,12 @@ function fire() {
     const sy = (Math.random() - 0.5) * 2 * W.spread * spreadK + (k === 0 ? ay : ay * 0.5), sp = (Math.random() - 0.5) * 2 * W.spread * spreadK * 0.7 + (k === 0 ? ap : ap * 0.5);
     const [dx, dy, dz] = aimDir(sy, sp); const r = hitscan(dx, dy, dz);
     if (r.hit) {
-      const dmg = (W.dmg[0] + Math.random() * (W.dmg[1] - W.dmg[0])) * (P.buff.power > 0 ? 2 : 1);
+      const dmg = (W.dmg[0] + Math.random() * (W.dmg[1] - W.dmg[0])) * dmgMul();
       const dist = r.t; const falloff = P.cur === 'shotgun' ? Math.max(0.25, 1 - dist / 22) : 1;
       const kill = G.enemies.hurt(r.hit.enemy, Math.round(dmg * falloff), r.hit.head);
       spawnFx(r.px, r.py, r.pz, 'blood', 3); hitAny = true; killedAny = killedAny || kill; headAny = headAny || !!r.hit.head;
     } else {
-      if (r.wall && G.traps && G.traps.shotAt(r.px, r.pz, (W.dmg[0] + W.dmg[1]) / 2 * (P.buff.power > 0 ? 2 : 1) * (P.cur === 'shotgun' ? 2.5 : 1))) hitAny = hitAny;
+      if (r.wall && G.traps && G.traps.shotAt(r.px, r.pz, (W.dmg[0] + W.dmg[1]) / 2 * dmgMul() * (P.cur === 'shotgun' ? 2.5 : 1))) hitAny = hitAny;
       else { spawnFx(r.px, r.py, r.pz, 'spark', 3); spawnFx(r.px, r.py, r.pz, 'dust', 1); }
     }
   }
@@ -360,7 +438,9 @@ function meleeStrike() {
   for (const off of [-0.12, 0, 0.12]) {
     const [dx, dy, dz] = aimDir(off, 0), r = hitscan(dx, dy, dz, W.reach);
     if (r.hit && r.t <= W.reach) {
-      G.enemies.hurt(r.hit.enemy, Math.round((W.dmg[0] + Math.random() * (W.dmg[1] - W.dmg[0])) * (P.buff.power > 0 ? 2 : 1)), false); spawnFx(r.px, r.py, r.pz, 'blood', 4); hitSomething = true; break;
+      const en = r.hit.enemy;
+      if (en.state === 'idle' && !en.boss) { G.enemies.hurt(en, en.hp + 1, false); spawnFx(r.px, r.py, r.pz, 'blood', 5); toast('無聲暗殺！', 'good'); hitSomething = true; break; }
+      G.enemies.hurt(en, Math.round((W.dmg[0] + Math.random() * (W.dmg[1] - W.dmg[0])) * dmgMul()), false); spawnFx(r.px, r.py, r.pz, 'blood', 4); hitSomething = true; break;
     }
   }
   if (hitSomething) { audio.sfx('knife_hit'); G.enemies.noise(P.x, P.z, 6); }
@@ -371,6 +451,7 @@ function collect(it) {
   switch (it.type) {
     case 'food': if (P.hp >= 100) return false; P.hp = Math.min(100, P.hp + 10); audio.sfx('health'); toast('補充體力 +10', 'good'); break;
     case 'medkit': if (P.hp >= 100) return false; P.hp = Math.min(100, P.hp + 25); audio.sfx('health'); toast('急救包 +25', 'good'); break;
+    case 'clock': if (G.timeLeft == null) return false; G.timeLeft += 20; audio.sfx('buff'); toast('時間 +20 秒', 'good'); break;
     case 'potion_speed': P.buff.speed = 12; audio.sfx('buff'); toast('加速藥水！跑更快 12 秒', 'good'); break;
     case 'shield': P.buff.shield = 6; audio.sfx('buff'); toast('無敵護盾！6 秒不受傷', 'good'); break;
     case 'power': P.buff.power = 15; audio.sfx('buff'); toast('雙倍傷害！15 秒', 'good'); break;
@@ -379,7 +460,7 @@ function collect(it) {
     case 'armor': if (P.armor >= 100) return false; P.armor = Math.min(100, P.armor + 30); audio.sfx('pickup'); toast('護甲 +30', 'good'); break;
     case 'key_gold': P.keys.gold = true; audio.sfx('key'); toast('拿到金鑰匙！', 'good'); break;
     case 'key_silver': P.keys.silver = true; audio.sfx('key'); toast('拿到銀鑰匙！', 'good'); break;
-    case 'treasure': { const s = TREASURE_SCORE[it.sub] || 500; P.score += s; G.treasure++; audio.sfx('treasure'); toast(`${TREASURE_NAME[it.sub] || '寶物'} +${s}`, 'good'); break; }
+    case 'treasure': { const s = TREASURE_SCORE[it.sub] || 500; P.score += s; P.coins += s; G.treasure++; audio.sfx('treasure'); toast(`${TREASURE_NAME[it.sub] || '寶物'} +${s}`, 'good'); break; }
     default:
       if (it.type.startsWith('weapon_')) {
         const id = it.type.slice(7), W = WEAPONS[id];
@@ -412,7 +493,7 @@ function updatePlayer(dt) {
   P.yaw += turn * 2.3 * dt;
   const fx = Math.sin(P.yaw), fz = -Math.cos(P.yaw), rx = Math.cos(P.yaw), rz = Math.sin(P.yaw);
   let wx = fx * fwd + rx * str, wz = fz * fwd + rz * str; const l = Math.hypot(wx, wz); if (l > 0) { wx /= l; wz /= l; }
-  const speed = 6.0 * (P.buff.speed > 0 ? 1.45 : 1), acc = l > 0 ? 14 : 12;
+  const speed = 6.0 * (P.buff.speed > 0 ? 1.45 : 1) * (1 + 0.08 * P.upg.run), acc = l > 0 ? 14 : 12;
   P.vx += (wx * speed - P.vx) * Math.min(1, acc * dt); P.vz += (wz * speed - P.vz) * Math.min(1, acc * dt);
   const before = [P.x, P.z];
   [P.x, P.z] = w.tryMove(P.x, P.z, P.vx * dt, P.vz * dt, 0.38);
@@ -446,7 +527,7 @@ function interact() {
     else if (r === 'locked_silver') { toast('需要銀鑰匙', 'bad'); audio.sfx('locked'); }
   } else if (hit.type === 'push') { w.push(hit.pw); }
   else if (hit.type === 'exit') {
-    if (G.hostage && !G.hostage.freed) { toast('還有人質沒救出來！', 'bad'); audio.sfx('locked'); return; }
+    { const eb = exitBlock(); if (eb) { toast(eb, 'bad'); audio.sfx('locked'); return; } }
     if (G.levelIndex === LEVELS.length - 1 && !G.bossDead) { toast('統領還在城裡！先打倒他', 'bad'); audio.sfx('locked'); return; }
     finishLevel();
   }
@@ -463,12 +544,16 @@ function finishLevel() {
   if (s.kills >= s.kTotal) { bonus += 1000; notes.push('全部殲滅 +1000'); }
   if (s.tr >= s.tTotal && s.tTotal > 0) { bonus += 1000; notes.push('寶物全拿 +1000'); }
   if (s.sec >= s.sTotal && s.sTotal > 0) { bonus += 1000; notes.push('秘密全找到 +1000'); }
-  P.score += bonus;
+  const md = G.lv.cfg.mode;
+  if (md === 'sneak' && !G.alarm) { bonus += 5000; notes.push('完美潛行 +5000'); }
+  if (md === 'escape' && G.timeLeft > 0) { const b = Math.floor(G.timeLeft) * 20; bonus += b; notes.push(`剩餘時間 ${Math.floor(G.timeLeft)} 秒 +${b}`); }
+  if (md === 'defense') { bonus += 3000; notes.push('守城成功 +3000'); }
+  P.score += bonus; P.coins += bonus;
   G.mode = 'sum'; audio.stop(0.3); audio.jingle('clear'); if (document.pointerLockElement) document.exitPointerLock();
   $('sum-t').textContent = `第 ${G.levelIndex + 1} 關　${G.lv.cfg.name}　完成`;
   $('sum-rows').innerHTML = `<div class="row"><span>擊倒敵人</span><span>${s.kills} / ${s.kTotal}</span></div><div class="row"><span>找到寶物</span><span>${s.tr} / ${s.tTotal}</span></div><div class="row"><span>發現秘密</span><span>${s.sec} / ${s.sTotal}</span></div><div class="row"><span>花費時間</span><span>${fmtTime(s.time)}</span></div>${notes.map((n) => `<div class="row gold"><span>${n}</span><span></span></div>`).join('')}<div class="row"><span>目前分數</span><span>${P.score}</span></div>`;
   $('sum-h').textContent = G.levelIndex < LEVELS.length - 1 ? '按 Enter 前往下一關' : '按 Enter 繼續';
-  save({ level: Math.min(LEVELS.length - 1, G.levelIndex + 1), score: P.score });
+  save({ level: Math.min(LEVELS.length - 1, G.levelIndex + 1), score: P.score, coins: P.coins, upg: P.upg });
   showScreen('s-sum');
 }
 function victory() {
@@ -481,7 +566,7 @@ function victory() {
 }
 
 // ======================= 畫面 / 選單 =======================
-const screens = ['s-title', 's-help', 's-pause', 's-sum', 's-dead', 's-win', 's-load'];
+const screens = ['s-title', 's-help', 's-pause', 's-sum', 's-shop', 's-dead', 's-win', 's-load'];
 const raf2 = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 async function prefetch(theme, label) {
   showScreen('s-load'); $('load-t').textContent = label || '準備中…'; $('load-b').style.width = '0%';
@@ -544,6 +629,7 @@ function populateTitle() {
 }
 
 function newGame(levelIdx, score) {
+  const sv = load(); if (levelIdx > 0 && sv.level === levelIdx) { P.coins = sv.coins || 0; P.upg = { dmg: 0, run: 0, ...(sv.upg || {}) }; } else { P.coins = 0; P.upg = { dmg: 0, run: 0 }; }
   audio.init(); applyLoadout(loadoutFor(levelIdx)); P.score = score; P.lives = 3; startLevel(levelIdx, true);
 }
 function startLevel(i, fresh) {
@@ -570,6 +656,52 @@ function startLevel(i, fresh) {
 }
 function retryLevel() {
   const s = G.snapshot; applyLoadout(s); startLevel(G.levelIndex, false);
+}
+// ======================= 商店 =======================
+const SHOP = [
+  { id: 'ammo', nm: '補充子彈', ds: '+60 發（手槍、衝鋒槍、步槍共用）', price: () => 1500, max: () => false, buy: () => { P.ammo.bullets = Math.min(250, P.ammo.bullets + 60); } },
+  { id: 'shells', nm: '補充散彈', ds: '+24 發（散彈槍用）', price: () => 1200, max: () => false, buy: () => { P.ammo.shells = Math.min(60, P.ammo.shells + 24); } },
+  { id: 'armor', nm: '護甲補滿', ds: '護甲回到 100', price: () => 2000, max: () => P.armor >= 100, buy: () => { P.armor = 100; } },
+  { id: 'heal', nm: '體力補滿', ds: '生命回到 100', price: () => 1500, max: () => P.hp >= 100, buy: () => { P.hp = 100; } },
+  { id: 'dmg', nm: () => `武器強化 Lv ${P.upg.dmg}/3`, ds: '所有武器傷害再 +15%', price: () => [4000, 7000, 10000][P.upg.dmg] || 0, max: () => P.upg.dmg >= 3, buy: () => { P.upg.dmg++; } },
+  { id: 'run', nm: () => `輕裝跑鞋 Lv ${P.upg.run}/3`, ds: '移動速度再 +8%', price: () => [3000, 5000, 8000][P.upg.run] || 0, max: () => P.upg.run >= 3, buy: () => { P.upg.run++; } },
+  { id: 'life', nm: '多一條命', ds: '生命數 +1（最多 6）', price: () => 6000, max: () => P.lives >= 6, buy: () => { P.lives++; } },
+];
+let shopSel = 0, shopChk = new Set();
+const fmt = (n) => Number(n).toLocaleString('en-US');
+function shopTotal() { let t = 0; for (const i of shopChk) t += SHOP[i].price(); return t; }
+function renderShop() {
+  $('shop-coins').textContent = fmt(P.coins);
+  $('shop-rows').innerHTML = SHOP.map((it, i) => {
+    const mx = it.max(), pr = it.price(), nm = typeof it.nm === 'function' ? it.nm() : it.nm;
+    return `<div class="srow${i === shopSel ? ' cur' : ''}${shopChk.has(i) ? ' on' : ''}${mx ? ' max' : ''}${!mx && pr > P.coins ? ' no' : ''}" data-i="${i}"><span class="chk"></span><span class="nm">${nm}<small>${mx ? '已達上限' : it.ds}</small></span><span class="pr">${mx ? '—' : fmt(pr)}</span></div>`;
+  }).join('');
+  $('shop-tot').textContent = `已選 ${shopChk.size} 項　合計 ${fmt(shopTotal())}`;
+  document.querySelectorAll('#shop-rows .srow').forEach((el) => { el.onclick = () => { shopSel = +el.dataset.i; toggleShop(shopSel); }; });
+}
+function toggleShop(i) {
+  if (SHOP[i].max()) { audio.sfx('locked'); return; }
+  if (shopChk.has(i)) shopChk.delete(i); else shopChk.add(i);
+  audio.sfx('ui'); renderShop();
+}
+function buyShop() {
+  const sel = [...shopChk].filter((i) => !SHOP[i].max()); if (!sel.length) return false;
+  // 同一個強化只買一次；依序檢查是否買得起
+  const total = sel.reduce((a, i) => a + SHOP[i].price(), 0);
+  if (total > P.coins) { audio.sfx('locked'); toast('金幣不夠', 'bad'); renderShop(); return true; }
+  for (const i of sel) { const it = SHOP[i]; P.coins -= it.price(); it.buy(); }
+  shopChk.clear(); audio.sfx('treasure'); save({ coins: P.coins, upg: P.upg }); renderShop(); return true;
+}
+function openShop() {
+  G.mode = 'shop'; shopSel = 0; shopChk = new Set(); renderShop(); showScreen('s-shop');
+  $('shop-buy').onclick = () => buyShop(); $('shop-go').onclick = () => closeShop();
+}
+function closeShop() { hideScreens(); nextLevel(); }
+function shopKey(c) {
+  if (c === 'ArrowDown') { shopSel = (shopSel + 1) % SHOP.length; audio.sfx('ui'); renderShop(); }
+  else if (c === 'ArrowUp') { shopSel = (shopSel + SHOP.length - 1) % SHOP.length; audio.sfx('ui'); renderShop(); }
+  else if (c === 'Space') toggleShop(shopSel);
+  else if (c === 'Enter' || c === 'NumpadEnter') { if (!buyShop()) closeShop(); }
 }
 function nextLevel() {
   if (G.levelIndex >= LEVELS.length - 1) { victory(); return; }
@@ -618,7 +750,8 @@ window.addEventListener('keydown', (e) => {
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(c)) e.preventDefault();
   if (G.mode === 'title') { menuKey(c); return; }
   if (G.mode === 'help') { if (c === 'Enter' || c === 'Escape' || c === 'Space' || c === 'Backspace') closeHelp(); return; }
-  if (G.mode === 'sum') { if (c === 'Enter' || c === 'Space') { hideScreens(); nextLevel(); } return; }
+  if (G.mode === 'sum') { if (c === 'Enter' || c === 'Space') { if (G.levelIndex >= LEVELS.length - 1) { hideScreens(); nextLevel(); } else openShop(); } return; }
+  if (G.mode === 'shop') { shopKey(c); return; }
   if (G.mode === 'win') { menuKey(c); return; }
   if (G.mode === 'dead') { if (c === 'Enter' || c === 'Space') retryLevel(); else menuKey(c); return; }
   if (G.mode === 'paused') { if (c === 'Escape') resumeGame(); else menuKey(c); return; }
@@ -727,7 +860,7 @@ function updatePrompt() {
     if (hostageNear()) t = '按 <kbd>E</kbd> 解開繩子，救出人質';
     else if (h) {
       if (h.type === 'door') { const d = h.door; t = d.kind === 'gold' && !P.keys.gold ? '需要 金鑰匙' : d.kind === 'silver' && !P.keys.silver ? '需要 銀鑰匙' : '按 <kbd>E</kbd> 開門'; }
-      else if (h.type === 'exit') t = G.hostage && !G.hostage.freed ? '先救出人質' : G.levelIndex === LEVELS.length - 1 && !G.bossDead ? '先打倒統領' : '按 <kbd>E</kbd> 搭電梯離開';
+      else if (h.type === 'exit') t = exitBlock() ? exitBlock().replace('！', '').replace('還有人質沒救出來', '先救出人質') : G.levelIndex === LEVELS.length - 1 && !G.bossDead ? '先打倒統領' : '按 <kbd>E</kbd> 搭電梯離開';
     }
   }
   if (t !== prompt) { prompt = t; const el = $('prompt'); el.innerHTML = t; el.classList.toggle('on', !!t); }
@@ -757,7 +890,7 @@ function frame(now, dtOv) {
       if (P.meleeT > 0) { P.meleeT -= dt; if (P.meleeT <= 0) meleeStrike(); }
       if ((mouseDown) && (WEAPONS[P.cur].auto || !P.fireLatch)) { if (fire() && !WEAPONS[P.cur].auto) P.fireLatch = true; }
       if (!mouseDown) P.fireLatch = false;
-      updateItems(dt); updateHostage(dt); if (G.traps) G.traps.update(dt); updateBuffs(dt);
+      updateItems(dt); updateHostage(dt); if (G.traps) G.traps.update(dt); updateBuffs(dt); updateMode(dt);
       updatePrompt();
       mapT -= dt; if (mapT <= 0) { mapT = 0.2; markSeen(); if (mapOn) drawMap(ui.mapc, false); }
       musicT -= dt;
@@ -802,4 +935,4 @@ requestAnimationFrame(frame);
 (async () => { showScreen('s-load'); await loadPhotos(); await prefetch('courtyard', '載入中…'); toTitle(); })();
 
 // 測試／除錯接口
-window.__g = { freeHostage, step: (dt) => frame(performance.now(), dt), G, P, keys, camera, eng, vm, fire, interact, startLevel, newGame, toTitle, pauseGame, switchWeapon, finishLevel, victory, damagePlayer, audio, WEAPONS, TYPES, settings, drawMap };
+window.__g = { openShop, freeHostage, step: (dt) => frame(performance.now(), dt), G, P, keys, camera, eng, vm, fire, interact, startLevel, newGame, toTitle, pauseGame, switchWeapon, finishLevel, victory, damagePlayer, audio, WEAPONS, TYPES, settings, drawMap };

@@ -414,6 +414,7 @@ export class Enemies {
   wake(e, delay = 0.4) {
     if (e.state !== 'idle') return;
     e.state = 'alert'; e.react = delay; this.ctx.sfx && this.ctx.sfx('alert_' + e.type, e.x, e.z);
+    this.ctx.onWake && this.ctx.onWake(e);
   }
   // 射線檢查
   raycast(ox, oy, oz, dx, dy, dz, maxT) {
@@ -464,6 +465,11 @@ export class Enemies {
       }
     });
     this.ctx.onBossPhase && this.ctx.onBossPhase(ph);
+  }
+  // 執行期生成（守城波次用）：直接進入追擊
+  spawn(type, x, z) {
+    const ne = new Enemy({ type, gx: Math.floor(x / CELL), gz: Math.floor(z / CELL), angle: Math.random() * 6.28 }, this);
+    ne.x = x; ne.z = z; ne.state = 'chase'; ne.wave = true; this.list.push(ne); return ne;
   }
   moveToward(e, tx, tz, speed, dt) {
     const dx = tx - e.x, dz = tz - e.z, d = Math.hypot(dx, dz);
@@ -544,7 +550,7 @@ export class Enemies {
           // 偶爾轉頭
           const dot = Math.sin(e.face) * dx / (dist || 1) + Math.cos(e.face) * dz / (dist || 1);
           const seeRange = p.moving || p.firing ? T.sight : T.sight * 0.6;
-          if (los && ((dot > 0.15 && dist < seeRange) || dist < 4.5)) this.wake(e, 0.25 + Math.random() * 0.5);
+          if (los && ((dot > 0.15 && dist < seeRange) || (dist < 4.5 && (dot > -0.25 || (p.moving && dist < 2))))) this.wake(e, 0.25 + Math.random() * 0.5);
           break;
         }
         case 'alert': {

@@ -345,6 +345,9 @@ export class AudioEngine {
       case 'crash': { const g = sy.noise(t, 0.9, 0.8 * v, { type: 'lowpass', f0: 3500, f1: 200, q: 0.5 }); sy.out(g, 0.3); sy.tom(t, 70, 0.6 * v); [0, 0.05, 0.11, 0.2].forEach((d, i) => sy.fm(t + d, mtof(100 - i * 6), 0.3, 0.12 * v, { ratio: 3.7, index: 1.5, decay: 0.2, wet: 0.3 })); break; }
       case 'buff': [0, 1, 2, 3].forEach((i) => sy.fm(t + i * 0.06, mtof(72 + [0, 4, 7, 12][i]), 0.3, 0.17 * v, { ratio: 2, index: 1, decay: 0.2, wet: 0.35 })); break;
       case 'shield_hit': { sy.fm(t, mtof(96), 0.2, 0.2 * v, { ratio: 3, index: 1.2, decay: 0.12, wet: 0.3 }); break; }
+      case 'alarm': { for (let i = 0; i < 4; i++) { sy.tone(t + i * 0.32, 520, 0.16, 0.2 * v, 'square', { filter: 1800, wet: 0.1 }); sy.tone(t + i * 0.32 + 0.16, 760, 0.16, 0.2 * v, 'square', { filter: 1800, wet: 0.1 }); } break; }
+      case 'tick': sy.tone(t, 1400, 0.03, 0.16 * v, 'square', { wet: 0 }); break;
+      case 'wave': [0, 1, 2].forEach((i) => sy.tone(t + i * 0.18, mtof(48 + [0, 0, 5][i]), 0.5, 0.3 * v, 'sawtooth', { filter: 700, wet: 0.3 })); break;
       case 'push': { const g = sy.noise(t, 1.4, 0.35 * v, { type: 'lowpass', f0: 400, f1: 100 }); sy.out(g, 0.3); sy.tone(t, 45, 1.4, 0.25 * v, 'sawtooth', { filter: 120, wet: 0.2 }); break; }
       case 'secret': [0, 1, 2, 3, 4].forEach((i) => sy.fm(t + i * 0.08, mtof(72 + [0, 4, 7, 12, 16][i]), 0.3, 0.14 * v, { ratio: 3.5, index: 1, decay: 0.2, wet: 0.4 })); break;
       case 'pickup': sy.fm(t, mtof(79), 0.1, 0.18 * v, { ratio: 2, index: 1.2, decay: 0.1, wet: 0.2 }); sy.fm(t + 0.07, mtof(86), 0.2, 0.18 * v, { ratio: 2, index: 1.2, decay: 0.15, wet: 0.3 }); break;
