@@ -15,14 +15,14 @@ export const DEFENSE_WAVES = [
 ];
 
 export const LEVELS = [
-  { name: '城門庭園', size: 38, rooms: 8, minRoom: 5, maxW: 10, maxH: 8, gates: 1, dens: 24, theme: 'courtyard', trap: 0.3, seed: 1101,
+  { name: '城門庭園', size: 38, rooms: 8, minRoom: 5, maxW: 10, maxH: 8, gates: 1, dens: 24, theme: 'courtyard', trap: 0.5, seed: 1101,
     foes: { guard: 80, dog: 20 }, weapon: 'smg' },
   { name: '迎賓大廳', size: 44, rooms: 10, minRoom: 5, maxW: 11, maxH: 9, gates: 2, dens: 20, theme: 'hall', seed: 2202,
     foes: { guard: 58, dog: 14, officer: 28 }, weapon: 'shotgun' },
   { name: '藏書閣', size: 46, rooms: 11, minRoom: 5, maxW: 11, maxH: 9, gates: 2, dens: 18, theme: 'library', seed: 3303,
     foes: { guard: 42, dog: 18, officer: 40 }, weapon: 'rifle' },
   { name: '夜襲潛行', size: 46, rooms: 11, minRoom: 5, maxW: 11, maxH: 9, gates: 1, dens: 26, theme: 'courtyard', mode: 'sneak', trap: 0.3, seed: 1717,
-    foes: { guard: 70, officer: 30 }, weapon: null },
+    foes: { guard: 62, officer: 26, dog: 12 }, weapon: null },
   { name: '地下酒窖', size: 48, rooms: 12, minRoom: 5, maxW: 11, maxH: 9, gates: 2, dens: 16, theme: 'cellar', hostage: true, seed: 4404,
     foes: { guard: 34, dog: 16, officer: 28, heavy: 22 }, weapon: null },
   { name: '禮拜塔', size: 48, rooms: 12, minRoom: 5, maxW: 11, maxH: 9, gates: 2, dens: 15, theme: 'chapel', seed: 5505,
@@ -33,8 +33,8 @@ export const LEVELS = [
     foes: { guard: 30, dog: 16, officer: 30, heavy: 24 }, weapon: null },
   { name: '軍械地牢', size: 52, rooms: 13, minRoom: 5, maxW: 11, maxH: 9, gates: 2, dens: 13, theme: 'cellar', seed: 8808,
     foes: { guard: 22, dog: 14, officer: 28, heavy: 36 }, weapon: null },
-  { name: '守城之夜', size: 42, rooms: 8, minRoom: 6, maxW: 12, maxH: 10, gates: 0, dens: 20, theme: 'chapel', mode: 'defense', noFoes: true, trap: 0.4, seed: 3131,
-    foes: { guard: 1 }, weapon: null },
+  { name: '守城之夜', size: 42, rooms: 8, minRoom: 6, maxW: 12, maxH: 10, gates: 0, dens: 20, theme: 'chapel', mode: 'defense', trap: 0.8, seed: 3131,
+    foes: { guard: 50, officer: 25, dog: 15, heavy: 10 }, weapon: null },
   { name: '貴賓長廊', size: 50, rooms: 12, minRoom: 5, maxW: 12, maxH: 9, gates: 2, dens: 13, theme: 'hall', hostage: true, seed: 9909,
     foes: { guard: 24, dog: 12, officer: 38, heavy: 26 }, weapon: null },
   { name: '皇家藏經室', size: 52, rooms: 13, minRoom: 5, maxW: 11, maxH: 9, gates: 2, dens: 12, theme: 'library', seed: 1313,
@@ -437,8 +437,9 @@ function gen(index, seed) {
   const startPathBlock = new Set();
   for (const r of rooms) {
     const area = r.w * r.h;
-    let count = Math.max(1, Math.round(area / cfg.dens));
-    if (r === sr || cfg.noFoes) count = 0;
+    const mult = cfg.mode === 'sneak' ? 1.1 : cfg.mode === 'escape' ? 1.2 : index < 3 ? 1.3 : index < 9 ? 1.4 : 1.5;
+    let count = Math.max(1, Math.round(area / cfg.dens * mult));
+    if (r === sr) count = 0;
     if (r === chain[1] && index === 0) count = Math.min(count, 2);
     if (r === last && cfg.boss) count = Math.max(count, 5);
     for (let k = 0; k < count; k++) {
@@ -454,7 +455,7 @@ function gen(index, seed) {
   // 走廊守衛
   let cg = 0;
   for (const c of connections) {
-    if (cfg.noFoes || cg >= 3 + index) break;
+    if (cg >= 3 + index) break;
     const cand = c.path.filter(([x, z]) => roomId[idx(W, x, z)] < 0 && !doors.has(idx(W, x, z)) && free(x, z) && Math.abs(x - sr.cx) + Math.abs(z - sr.cz) > 12);
     if (cand.length > 6 && rnd() < 0.6) {
       const [x, z] = cand[ri(2, cand.length - 3)];
@@ -476,11 +477,28 @@ function gen(index, seed) {
   // 機關陷阱與新道具（獨立亂數，不影響既有配置）
   level.traps = [];
   {
-    const r2 = mulberry32(seed + 4242), dens = cfg.trap ?? 0.6;
+    const r2 = mulberry32(seed + 4242), dens = cfg.trap ?? 1.0;
     const ecell = new Set(level.enemies.map((e) => idx(W, e.gx, e.gz)));
     const ok = (x, z) => free(x, z) && !front.has(idx(W, x, z)) && !ecell.has(idx(W, x, z));
     const pickc = (r) => { for (let t = 0; t < 40; t++) { const x = r.x + Math.floor(r2() * r.w), z = r.z + Math.floor(r2() * r.h); if (ok(x, z)) return [x, z]; } return null; };
     const WD = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    // 走廊機關：筆直走廊上的尖刺與側牆噴火
+    {
+      const cor = [];
+      for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) {
+        const i = idx(W, x, z); if (cells[i] !== 0 || roomId[i] >= 0 || !ok(x, z) || doors.has(i)) continue;
+        let near = false; for (let dz = -2; dz <= 2 && !near; dz++) for (let dx = -2; dx <= 2; dx++) if (doors.has(idx(W, x + dx, z + dz))) { near = true; break; }
+        if (near) continue;
+        const ew = cells[idx(W, x - 1, z)] === 0 && cells[idx(W, x + 1, z)] === 0 && cells[idx(W, x, z - 1)] !== 0 && cells[idx(W, x, z + 1)] !== 0;
+        const ns = cells[idx(W, x, z - 1)] === 0 && cells[idx(W, x, z + 1)] === 0 && cells[idx(W, x - 1, z)] !== 0 && cells[idx(W, x + 1, z)] !== 0;
+        if (ew || ns) cor.push([x, z, ew]);
+      }
+      const nS = Math.min(cor.length, 2 + Math.floor(r2() * 3)), nF = Math.min(cor.length, 1 + Math.floor(r2() * 2));
+      const used = new Set();
+      const pickCor = () => { for (let t = 0; t < 30 && cor.length; t++) { const c = cor[Math.floor(r2() * cor.length)]; if (used.has(c[0] + ',' + c[1])) continue; let far = true; for (const u of used) { const [ux, uz] = u.split(',').map(Number); if (Math.abs(ux - c[0]) + Math.abs(uz - c[1]) < 6) { far = false; break; } } if (far) { used.add(c[0] + ',' + c[1]); return c; } } return null; };
+      for (let k = 0; k < nS; k++) { const c = pickCor(); if (c) { level.traps.push({ type: 'spike', gx: c[0], gz: c[1], ph: r2() * 4 }); take(c[0], c[1]); } }
+      for (let k = 0; k < nF; k++) { const c = pickCor(); if (c) { const w = c[2] ? [0, r2() < 0.5 ? 1 : -1] : [r2() < 0.5 ? 1 : -1, 0]; level.traps.push({ type: 'flame', gx: c[0], gz: c[1], wx: w[0], wz: w[1], ph: r2() * 5 }); take(c[0], c[1]); } }
+    }
     for (const r of rooms) {
       if (r === sr) continue;
       const area = r.w * r.h;
@@ -503,6 +521,7 @@ function gen(index, seed) {
         }
       }
       if (cfg.mode === 'escape' && r2() < 0.6) { const c = pickc(r); if (c) { level.items.push({ type: 'clock', gx: c[0], gz: c[1] }); take(c[0], c[1]); } }
+      if (r2() < 0.35) { const c = pickc(r); if (c) { level.items.push({ type: 'ammo', gx: c[0], gz: c[1] }); take(c[0], c[1]); } }
       if (r2() < 0.3) {
         const c = pickc(r);
         if (c) { level.items.push({ type: ['potion_speed', 'shield', 'power'][Math.floor(r2() * 3)], gx: c[0], gz: c[1] }); take(c[0], c[1]); }
@@ -514,13 +533,12 @@ function gen(index, seed) {
   level.start.angle = Math.atan2(chain[1].cz - sr.cz, chain[1].cx - sr.cx);
   level.enemyCount = level.enemies.length;
   if (cfg.mode === 'defense') {
-    level.enemyCount = DEFENSE_WAVES.reduce((a, w) => a + Object.values(w).reduce((x, y) => x + y, 0), 0);
+    level.enemyCount += DEFENSE_WAVES.reduce((a, w) => a + Object.values(w).reduce((x, y) => x + y, 0), 0);
     const r3 = mulberry32(seed + 5151); level.spawns = [];
     for (const r of rooms) {
       if (r === sr) continue;
       for (let t = 0; t < 14; t++) { const x = r.x + Math.floor(r3() * r.w), z = r.z + Math.floor(r3() * r.h); if (cells[idx(W, x, z)] === 0 && Math.abs(x - sr.cx) + Math.abs(z - sr.cz) > 10) { level.spawns.push([x, z]); if (t > 4) break; } }
     }
-    if (level.spawns.length < 6) return null;
   }
   level.connections = connections;
   return level;

@@ -1,0 +1,11 @@
+import { chromium } from 'playwright-core';
+const b = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true, args: ['--use-angle=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist','--enable-webgl','--no-sandbox','--allow-file-access-from-files'] });
+const p = await b.newPage({ viewport: { width: 640, height: 360 } });
+await p.goto('file:///home/claude/castle-strike/dist/index.html'); await p.waitForTimeout(2000);
+await p.evaluate(() => { __g.G.manual = true; __g.G.noRender = true; __g.newGame(4, 0); });
+await p.waitForFunction(() => __g.G.mode === 'playing', null, { timeout: 120000 });
+console.log(JSON.stringify(await p.evaluate(() => { const g=__g,G=g.G,P=g.P,W=G.world;
+ const key=G.items.find(i=>i.type==='key_gold'); const out={key:[key.x.toFixed(1),key.z.toFixed(1)],traps:G.lv.traps.filter(t=>Math.abs(t.gx-17)<4&&Math.abs(t.gz-20)<4), dc:[...W.circles||[]].length};
+ P.x=17.5*3; P.z=19.5*3; const circ=(W.decorCircles||[]).filter(c=>Math.hypot(c.x-key.x,c.z-key.z)<8).map(c=>[c.x.toFixed(1),c.z.toFixed(1),c.r]); out.circ=circ;
+ for(let i=0;i<120;i++){ const dx=key.x-P.x,dz=key.z-P.z,d=Math.hypot(dx,dz); if(d<0.5) break; [P.x,P.z]=W.tryMove(P.x,P.z,dx/d*0.3,dz/d*0.3,0.38); g.step(0.05);} out.end=[P.x.toFixed(2),P.z.toFixed(2)]; out.taken=key.taken; return out; })));
+await b.close();

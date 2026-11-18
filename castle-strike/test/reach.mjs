@@ -1,0 +1,12 @@
+import { chromium } from 'playwright-core';
+const b = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true, args: ['--use-angle=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist','--enable-webgl','--no-sandbox','--allow-file-access-from-files'] });
+const p = await b.newPage({ viewport: { width: 640, height: 360 } });
+await p.goto('file:///home/claude/castle-strike/dist/index.html'); await p.waitForTimeout(2000);
+await p.evaluate((L) => { __g.G.manual = true; __g.newGame(L, 0); }, +process.env.LV);
+await p.waitForFunction(() => __g.G.mode === 'playing', null, { timeout: 120000 });
+console.log(JSON.stringify(await p.evaluate(() => { const G=__g.G,W=G.world,Wd=W.W; const bfs=(skipDecor)=>{ const seen=new Set(),q=[[Math.floor(__g.P.x/3),Math.floor(__g.P.z/3)]]; seen.add(q[0][1]*Wd+q[0][0]); for(let i=0;i<q.length;i++){const [x,z]=q[i]; for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,nz=z+dz,j=nz*Wd+nx; if(!W.inb(nx,nz)||seen.has(j)||W.cells[j]!==0) continue; if(skipDecor&&W.decorCell.has(j)) continue; seen.add(j); q.push([nx,nz]);}} return seen; };
+ const a=bfs(false), c=bfs(true); const h=G.hostage, ex=G.lv.exit; const tgt=h?[Math.floor(h.x/3),Math.floor(h.z/3)]:null;
+ const blockers=[...W.decorCell].filter(j=>a.has(j)&&true).length;
+ const barrels=G.traps.barrels.map(b=>[Math.floor(b.x/3),Math.floor(b.z/3)]);
+ return { total:a.size, withDecor:c.size, hostageReach: tgt? [a.has(tgt[1]*Wd+tgt[0]), c.has(tgt[1]*Wd+tgt[0])]:null, exitFront:[ex.x,ex.z,ex.d], keys:G.lv.items.filter(i=>i.type.startsWith('key')).map(i=>[i.type,i.gx,i.gz,c.has(i.gz*Wd+i.gx)]), barrels:barrels.length, traps:G.lv.traps.filter(t=>t.type==='barrel').map(t=>[t.gx,t.gz]) }; })));
+await b.close();

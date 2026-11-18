@@ -44,15 +44,16 @@ for (let L = startL; L <= endL; L++) {
     if (G.timeLeft != null) G.timeLeft = 1e9;
     const log = [];
     // 收集所有鑰匙 + 寶物 (走過去)
-    let safety = 0;
-    while (safety++ < 40) {
+    let safety = 0; const skipSet = new Set(), skipped = [];
+    while (safety++ < 80) {
       const here = [Math.floor(P.x / 3), Math.floor(P.z / 3)];
       const want = G.items.filter((it) => !it.taken && (it.type.startsWith('key') || it.type === 'treasure' || it.type.startsWith('weapon')));
       if (!want.length) break;
-      let best = null;
-      for (const it of want) { const path = bfs(here[0], here[1], (x, z) => x === Math.floor(it.x / 3) && z === Math.floor(it.z / 3), P.keys); if (path && (!best || path.length < best.length)) best = path; }
+      let best = null, bit = null;
+      for (const it of want) { if (skipSet.has(it)) continue; const path = bfs(here[0], here[1], (x, z) => x === Math.floor(it.x / 3) && z === Math.floor(it.z / 3), P.keys); if (path && (!best || path.length < best.length)) { best = path; bit = it; } }
       if (!best) break;
       walk(best);
+      if (!bit.taken && Math.hypot(bit.x - P.x, bit.z - P.z) > 1.3) { skipSet.add(bit); skipped.push([bit.type, Math.floor(bit.x / 3), Math.floor(bit.z / 3), [P.x.toFixed(1), P.z.toFixed(1)]]); }
     }
     // 秘密牆：推
     for (const pw of W.pushwalls) { if (pw.state === 'idle') { W.push(pw); for (let i = 0; i < 40; i++) step(0.05); } }
@@ -65,7 +66,7 @@ for (let L = startL; L <= endL; L++) {
     if (G.hostage) {
       const h = G.hostage, hh = [Math.floor(P.x / 3), Math.floor(P.z / 3)];
       const hp = bfs(hh[0], hh[1], (x, z) => x === Math.floor(h.x / 3) && z === Math.floor(h.z / 3), P.keys);
-      if (!hp) return { error: 'no path to hostage' };
+      if (!hp) return { error: 'no path to hostage', skipped, keys: P.keys, hz: [Math.floor(h.x/3), Math.floor(h.z/3)], hcell: W.cells[Math.floor(h.z/3)*Wd+Math.floor(h.x/3)], hdec: W.decorCell.has(Math.floor(h.z/3)*Wd+Math.floor(h.x/3)), pc: hh, inDecor: W.decorCell.has(hh[1]*Wd+hh[0]), nb: DIRS.map(([dx,dz]) => { const j=(hh[1]+dz)*Wd+hh[0]+dx; return [W.cells[j], W.decorCell.has(j), !!W.doorAt.get(j)]; }) };
       walk(hp); P.yaw = Math.atan2(h.x - P.x, -(h.z - P.z)); step(0.05); g.interact(); step(0.05);
       for (let i = 0; i < 80; i++) step(0.05);
       hostInfo = { freed: h.freed, vis: h.sp.visible };
@@ -83,7 +84,7 @@ for (let L = startL; L <= endL; L++) {
     step(0.05);
     g.interact();
     step(0.05);
-    return { mode: G.mode, kills: G.kills, kT: lv.enemyCount, tr: G.treasure, tT: lv.treasure, sec: G.secrets, sT: lv.secrets, score: P.score, treasureLeft: items2, time: G.levelTime.toFixed(1), keys: P.keys, hostInfo };
+    return { mode: G.mode, kills: G.kills, kT: lv.enemyCount, tr: G.treasure, tT: lv.treasure, sec: G.secrets, sT: lv.secrets, score: P.score, treasureLeft: items2, time: G.levelTime.toFixed(1), keys: P.keys, hostInfo, skipped };
   });
   console.log('L' + (L + 1), JSON.stringify(res));
 }

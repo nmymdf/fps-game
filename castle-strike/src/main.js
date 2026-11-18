@@ -166,7 +166,7 @@ function initMode() {
     setTimeout(() => toast('限時逃脫！倒數結束前跑到出口，路上有時鐘可加時間'), 1500);
   } else if (m === 'defense') {
     G.wave = { n: 0, state: 'prep', t: 15, done: false };
-    setTimeout(() => toast('守住這個房間！撐過 4 波敵人，出口才會打開'), 1500);
+    setTimeout(() => toast('先清掉各房間的守衛，再守住起點房間！撐過 4 波，出口才會打開'), 1500);
   }
 }
 function triggerAlarm() {
@@ -180,18 +180,25 @@ function exitBlock() {
   return '';
 }
 const WAVE_ORDER = ['guard', 'dog', 'officer', 'heavy'];
-function startWave() {
-  const W = G.world, spec = DEFENSE_WAVES[G.wave.n], sp = G.lv.spawns;
-  for (const type of WAVE_ORDER) for (let k = 0; k < (spec[type] || 0); k++) {
-    let pos = null;
-    for (let t = 0; t < 14; t++) {
-      const c = sp[Math.floor(Math.random() * sp.length)], x = (c[0] + 0.5) * CELL, z = (c[1] + 0.5) * CELL;
-      if (Math.hypot(x - P.x, z - P.z) > 14 && (!W.los(x, z, P.x, P.z) || t > 9)) { pos = [x + (Math.random() - 0.5) * 1.2, z + (Math.random() - 0.5) * 1.2]; break; }
-    }
-    if (!pos) { const c = sp[Math.floor(Math.random() * sp.length)]; pos = [(c[0] + 0.5) * CELL, (c[1] + 0.5) * CELL]; }
-    const e = G.enemies.spawn(type, pos[0], pos[1]); enableShadows(e.group); e.blob.visible = false;
+function ringCells(lo, hi) {
+  const W = G.world, Wd = W.W, sx = Math.floor(P.x / CELL), sz = Math.floor(P.z / CELL), dist = new Map(), q = [[sx, sz]], out = [];
+  dist.set(sz * Wd + sx, 0);
+  for (let i = 0; i < q.length; i++) {
+    const [x, z] = q[i], d = dist.get(z * Wd + x); if (d >= lo && d <= hi) out.push([x, z]); if (d >= hi) continue;
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, nz = z + dz; if (!W.inb(nx, nz)) continue; const j = nz * Wd + nx; if (dist.has(j) || W.cells[j] !== 0) continue; dist.set(j, d + 1); q.push([nx, nz]); }
   }
-  G.wave.state = 'fight'; audio.sfx('wave'); toast(`第 ${G.wave.n + 1} 波來襲！`, 'bad');
+  return out;
+}
+function startWave() {
+  const W = G.world, spec = DEFENSE_WAVES[G.wave.n];
+  const ring = ringCells(7, 13), hidden = ring.filter((c) => !W.los((c[0] + 0.5) * CELL, (c[1] + 0.5) * CELL, P.x, P.z));
+  const pool = hidden.length >= 4 ? hidden : ring.length ? ring : G.lv.spawns;
+  for (const type of WAVE_ORDER) for (let k = 0; k < (spec[type] || 0); k++) {
+    const c = pool[Math.floor(Math.random() * pool.length)];
+    const e = G.enemies.spawn(type, (c[0] + 0.5) * CELL + (Math.random() - 0.5) * 1.2, (c[1] + 0.5) * CELL + (Math.random() - 0.5) * 1.2);
+    enableShadows(e.group); e.blob.visible = false;
+  }
+  G.wave.state = 'fight'; audio.sfx('wave'); toast(`第 ${G.wave.n + 1} 波來襲！從各個門口衝進來了`, 'bad');
 }
 let tickLast = -1;
 function updateMode(dt) {
@@ -296,8 +303,11 @@ const enemyCtx = {
     if (!e.summoned) G.kills++; P.score += e.T.score;
     P.mood = 'grin'; P.moodT = 0.9;
     spawnFx(e.x, 1.0, e.z, 'blood', 8);
-    if (e.type === 'guard' || e.type === 'officer') addItem('ammo', e.x, e.z, null, true);
-    else if (e.type === 'heavy') addItem('shells', e.x, e.z, null, true);
+    const dropAt = (t, amt, dx = 0, dz = 0) => { const it = addItem(t, e.x + dx, e.z + dz, null, true); if (amt) it.amt = amt; };
+    if (e.type === 'guard') dropAt('ammo', 15);
+    else if (e.type === 'officer') { dropAt('ammo', 20); if (Math.random() < 0.2) dropAt('armor', 0, 0.5, 0.3); }
+    else if (e.type === 'heavy') { dropAt('shells', 8); if (Math.random() < 0.25) dropAt('medkit', 0, 0.5, 0.3); }
+    else if (e.type === 'dog' && Math.random() < 0.15) dropAt('medkit');
     if (e.type === 'boss') { G.bossDead = true; G.winT = 3.5; toast('統領倒下了！', 'good'); }
   },
 };
@@ -455,8 +465,8 @@ function collect(it) {
     case 'potion_speed': P.buff.speed = 12; audio.sfx('buff'); toast('加速藥水！跑更快 12 秒', 'good'); break;
     case 'shield': P.buff.shield = 6; audio.sfx('buff'); toast('無敵護盾！6 秒不受傷', 'good'); break;
     case 'power': P.buff.power = 15; audio.sfx('buff'); toast('雙倍傷害！15 秒', 'good'); break;
-    case 'ammo': P.ammo.bullets = Math.min(250, P.ammo.bullets + 12); audio.sfx('pickup'); toast('子彈 +12'); break;
-    case 'shells': P.ammo.shells = Math.min(60, P.ammo.shells + 6); audio.sfx('pickup'); toast('散彈 +6'); break;
+    case 'ammo': { const n = it.amt || 15; P.ammo.bullets = Math.min(300, P.ammo.bullets + n); audio.sfx('pickup'); toast(`子彈 +${n}`); break; }
+    case 'shells': { const n = it.amt || 8; P.ammo.shells = Math.min(80, P.ammo.shells + n); audio.sfx('pickup'); toast(`散彈 +${n}`); break; }
     case 'armor': if (P.armor >= 100) return false; P.armor = Math.min(100, P.armor + 30); audio.sfx('pickup'); toast('護甲 +30', 'good'); break;
     case 'key_gold': P.keys.gold = true; audio.sfx('key'); toast('拿到金鑰匙！', 'good'); break;
     case 'key_silver': P.keys.silver = true; audio.sfx('key'); toast('拿到銀鑰匙！', 'good'); break;
@@ -466,7 +476,7 @@ function collect(it) {
         const id = it.type.slice(7), W = WEAPONS[id];
         if (!P.weapons[id]) { P.weapons[id] = true; P.mag[id] = W.mag; toast(`得到 ${W.name}！按 ${W.slot} 切換`, 'good'); audio.sfx('weapon'); P.mood = 'grin'; P.moodT = 1.2; refreshWeaponList(); setTimeout(() => switchWeapon(id), 50); }
         else toast('補充彈藥');
-        if (W.ammo === 'shells') P.ammo.shells = Math.min(60, P.ammo.shells + 8); else P.ammo.bullets = Math.min(250, P.ammo.bullets + 30);
+        if (W.ammo === 'shells') P.ammo.shells = Math.min(80, P.ammo.shells + 8); else P.ammo.bullets = Math.min(300, P.ammo.bullets + 30);
       }
   }
   P.flash = 0.35; P.score += it.type === 'treasure' ? 0 : 0;
@@ -659,8 +669,8 @@ function retryLevel() {
 }
 // ======================= 商店 =======================
 const SHOP = [
-  { id: 'ammo', nm: '補充子彈', ds: '+60 發（手槍、衝鋒槍、步槍共用）', price: () => 1500, max: () => false, buy: () => { P.ammo.bullets = Math.min(250, P.ammo.bullets + 60); } },
-  { id: 'shells', nm: '補充散彈', ds: '+24 發（散彈槍用）', price: () => 1200, max: () => false, buy: () => { P.ammo.shells = Math.min(60, P.ammo.shells + 24); } },
+  { id: 'ammo', nm: '補充子彈', ds: '+60 發（手槍、衝鋒槍、步槍共用）', price: () => 1500, max: () => false, buy: () => { P.ammo.bullets = Math.min(300, P.ammo.bullets + 60); } },
+  { id: 'shells', nm: '補充散彈', ds: '+24 發（散彈槍用）', price: () => 1200, max: () => false, buy: () => { P.ammo.shells = Math.min(80, P.ammo.shells + 24); } },
   { id: 'armor', nm: '護甲補滿', ds: '護甲回到 100', price: () => 2000, max: () => P.armor >= 100, buy: () => { P.armor = 100; } },
   { id: 'heal', nm: '體力補滿', ds: '生命回到 100', price: () => 1500, max: () => P.hp >= 100, buy: () => { P.hp = 100; } },
   { id: 'dmg', nm: () => `武器強化 Lv ${P.upg.dmg}/3`, ds: '所有武器傷害再 +15%', price: () => [4000, 7000, 10000][P.upg.dmg] || 0, max: () => P.upg.dmg >= 3, buy: () => { P.upg.dmg++; } },
