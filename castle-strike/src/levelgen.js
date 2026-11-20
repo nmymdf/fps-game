@@ -299,8 +299,8 @@ function gen(index, seed) {
   }
   // 角落擺設
   const cornerTypes = {
-    courtyard: ['plant', 'crate', 'barrel'], hall: ['statue', 'table', 'plant'], library: ['table', 'statue', 'crate'],
-    cellar: ['barrel', 'crate', 'barrel', 'barrel'], chapel: ['candelabra', 'statue', 'candelabra'], throne: ['statue', 'candelabra'],
+    courtyard: ['plant', 'crate', 'barrel'], hall: ['statue', 'table', 'plant', 'urn'], library: ['table', 'statue', 'crate', 'urn'],
+    cellar: ['barrel', 'crate', 'barrel', 'barrel'], chapel: ['candelabra', 'statue', 'candelabra', 'urn'], throne: ['statue', 'candelabra', 'urn'],
   }[cfg.theme];
   for (const r of rooms) {
     if (r === sr) continue;
@@ -482,6 +482,23 @@ function gen(index, seed) {
     const ok = (x, z) => free(x, z) && !front.has(idx(W, x, z)) && !ecell.has(idx(W, x, z));
     const pickc = (r) => { for (let t = 0; t < 40; t++) { const x = r.x + Math.floor(r2() * r.w), z = r.z + Math.floor(r2() * r.h); if (ok(x, z)) return [x, z]; } return null; };
     const WD = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    // 精英兵
+    for (const e of level.enemies) if (index > 0 && ['guard', 'officer', 'heavy'].includes(e.type) && r2() < 0.08 + index * 0.008) e.elite = true;
+    // 牆邊可打破的雜物
+    const BREAK = { courtyard: ['crate', 'barrel', 'plant'], hall: ['urn', 'plant', 'urn'], library: ['crate', 'urn'], cellar: ['barrel', 'crate'], chapel: ['urn', 'urn', 'crate'], throne: ['urn'] }[cfg.theme] || ['crate'];
+    for (const r of rooms) {
+      const n = 1 + Math.floor(r2() * 3);
+      for (let k = 0, t = 0; k < n && t < 30; t++) {
+        const x = r.x + Math.floor(r2() * r.w), z = r.z + Math.floor(r2() * r.h);
+        if (!(x === r.x || x === r.x + r.w - 1 || z === r.z || z === r.z + r.h - 1)) continue;
+        if (!ok(x, z)) continue;
+        let nearDoor = false; for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) if (doors.has(idx(W, x + dx, z + dz))) nearDoor = true;
+        if (nearDoor) continue;
+        let opening = false; for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, nz = z + dz; if ((nx < r.x || nx >= r.x + r.w || nz < r.z || nz >= r.z + r.h) && cells[idx(W, nx, nz)] !== 1) opening = true; }
+        if (opening) continue;
+        level.decor.push({ type: BREAK[Math.floor(r2() * BREAK.length)], gx: x, gz: z, block: true, rot: r2() * 6.28 }); take(x, z); k++;
+      }
+    }
     // 走廊機關：筆直走廊上的尖刺與側牆噴火
     {
       const cor = [];

@@ -261,7 +261,7 @@ export class World {
       for (const [w, h, x, y] of [[1.6, 0.1, 0, 1.85 + 0.575], [1.6, 0.1, 0, 1.85 - 0.575], [0.1, 1.05, -0.75, 1.85], [0.1, 1.05, 0.75, 1.85]]) {
         const f = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.08), frameM); f.position.set(x, y, 0.03); g.add(f);
       }
-      place(p, g);
+      p._obj = place(p, g);
     }
     // 出口綠燈
     const ex = lv.exit, n = DIRS[ex.d];
@@ -301,7 +301,7 @@ export class World {
       const o = buildDecor(d.type, this.theme, this.rnd);
       o.position.set((d.gx + 0.5) * CELL, 0, (d.gz + 0.5) * CELL);
       if (d.rot) o.rotation.y = d.rot;
-      this.group.add(o);
+      this.group.add(o); d._obj = o;
       if (d.block) {
         const r = decorRadius(d.type);
         this.decorCircles.push({ x: o.position.x, z: o.position.z, r });

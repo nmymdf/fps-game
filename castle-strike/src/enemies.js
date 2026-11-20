@@ -11,11 +11,11 @@ const S = (r, m, x = 0, y = 0, z = 0, sx = 1, sy = 1, sz = 1) => { const o = new
 const C = (rt, rb, h, m, x = 0, y = 0, z = 0, seg = 12) => { const o = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), m); o.position.set(x, y, z); return o; };
 
 export const TYPES = {
-  guard:   { name: '衛兵', hp: 28, r: 0.36, h: 1.8, speed: 2.6, score: 100, range: 17, dmg: [4, 8], cd: [0.8, 1.6], wind: 0.4, burst: 1, pain: 0.7, acc: 0.8, sight: 20 },
-  officer: { name: '軍官', hp: 48, r: 0.36, h: 1.85, speed: 3.3, score: 400, range: 19, dmg: [7, 12], cd: [0.45, 1.0], wind: 0.28, burst: 2, pain: 0.55, acc: 0.95, sight: 24 },
-  heavy:   { name: '重裝兵', hp: 110, r: 0.5, h: 2.0, speed: 2.0, score: 700, range: 14, dmg: [16, 24], cd: [1.2, 2.0], wind: 0.5, burst: 1, pain: 0.2, acc: 0.8, sight: 20, pellets: 3 },
-  dog:     { name: '軍犬', hp: 20, r: 0.45, h: 1.1, speed: 5.4, score: 200, range: 1.7, dmg: [6, 10], cd: [0.7, 0.9], wind: 0.2, burst: 1, pain: 0.8, acc: 1, sight: 18, melee: true },
-  boss:    { name: '城堡統領', hp: 700, r: 0.62, h: 2.6, speed: 2.4, score: 5000, range: 22, dmg: [6, 10], cd: [0.9, 1.4], wind: 0.5, burst: 7, pain: 0, acc: 0.9, sight: 40 },
+  guard:   { name: '衛兵', hp: 40, r: 0.36, h: 1.8, speed: 2.6, score: 100, range: 17, dmg: [4, 8], cd: [0.8, 1.6], wind: 0.4, burst: 1, pain: 0.35, acc: 0.8, sight: 20 },
+  officer: { name: '軍官', hp: 66, r: 0.36, h: 1.85, speed: 3.3, score: 400, range: 19, dmg: [7, 12], cd: [0.45, 1.0], wind: 0.28, burst: 2, pain: 0.28, acc: 0.95, sight: 24 },
+  heavy:   { name: '重裝兵', hp: 150, r: 0.5, h: 2.0, speed: 2.0, score: 700, range: 14, dmg: [16, 24], cd: [1.2, 2.0], wind: 0.5, burst: 1, pain: 0.1, acc: 0.8, sight: 20, pellets: 3 },
+  dog:     { name: '軍犬', hp: 26, r: 0.45, h: 1.1, speed: 5.4, score: 200, range: 1.7, dmg: [6, 10], cd: [0.7, 0.9], wind: 0.2, burst: 1, pain: 0.5, acc: 1, sight: 18, melee: true },
+  boss:    { name: '城堡統領', hp: 900, r: 0.62, h: 2.6, speed: 2.4, score: 5000, range: 22, dmg: [6, 10], cd: [0.9, 1.4], wind: 0.5, burst: 7, pain: 0, acc: 0.9, sight: 40 },
 };
 
 // ---------- 模型 ----------
@@ -262,7 +262,14 @@ const SPRITE_TYPES = ['guard', 'officer', 'heavy', 'dog', 'boss'];
 export class Enemy {
   constructor(def, mgr) {
     this.mgr = mgr; this.type = def.type; this.T = TYPES[def.type];
-    this.hp = this.T.hp; this.maxHp = this.T.hp;
+    const B = TYPES[def.type];
+    if (def.elite && !['dog', 'boss'].includes(def.type)) {
+      this.elite = true;
+      this.T = { ...B, hp: B.hp * 2, acc: Math.min(1, B.acc * 1.15), cd: B.cd.map((c) => c * 0.7), dmg: B.dmg.map((d) => Math.round(d * 1.2)), pain: B.pain * 0.4, score: B.score * 2, speed: B.speed * 1.1 };
+    }
+    this.dm = (mgr.ctx && mgr.ctx.diffMul) ? mgr.ctx.diffMul() : { hp: 1, acc: 1, cd: 1 };
+    this.hp = Math.round(this.T.hp * this.dm.hp); this.maxHp = this.hp;
+    this.strafeT = 0; this.strafeDir = Math.random() < 0.5 ? 1 : -1; this.style = Math.random();
     this.x = (def.gx + 0.5) * CELL; this.z = (def.gz + 0.5) * CELL;
     this.face = Math.atan2(Math.cos(def.angle), Math.sin(def.angle)); // 模型 +z 為正面
     this.state = 'idle'; this.t = Math.random() * 3; this.react = 0; this.cool = 1; this.windT = 0; this.shots = 0; this.burstLeft = 0;
@@ -279,6 +286,15 @@ export class Enemy {
     mgr.scene.add(this.group);
     this.boss = def.type === 'boss';
     this.drop = null;
+    if (this.elite) {
+      if (m.sprite) {
+        const mt = m.mat; mt.color.set(0xffc4b8);
+        m.setFlash = (on) => { mt.emissive.set(on ? 0xff2a18 : 0x701a10); mt.emissiveIntensity = on ? 1.6 : 0.75; mt.emissiveMap = on ? null : mt.map; mt.needsUpdate = true; };
+        m.setFlash(false);
+      }
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.68, 32), new THREE.MeshBasicMaterial({ color: 0xff3020, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide }));
+      ring.rotation.x = -Math.PI / 2; ring.position.y = 0.03; this.group.add(ring); this.ring = ring;
+    }
   }
   get cell() { return [Math.floor(this.x / CELL), Math.floor(this.z / CELL)]; }
   setFlash(on) {
@@ -415,6 +431,36 @@ export class Enemies {
     if (e.state !== 'idle') return;
     e.state = 'alert'; e.react = delay; this.ctx.sfx && this.ctx.sfx('alert_' + e.type, e.x, e.z);
     this.ctx.onWake && this.ctx.onWake(e);
+    if (!e.fromShout && !e.summoned && !e.wave) e.shoutT = 0.7 + Math.random() * 0.4;
+  }
+  // 呼叫支援：叫醒附近（路徑距離）還沒發現你的同伴
+  shout(e) {
+    const R = { officer: 12, guard: 8, heavy: 6, dog: 6 }[e.type] || 0; if (!R) return;
+    const [gx, gz] = e.cell, f = this.world.distField(gx, gz, R), W = this.world.W; let n = 0;
+    for (const o of this.list) {
+      if (o === e || o.dead || o.state !== 'idle') continue;
+      const [ox, oz] = o.cell, d = f[oz * W + ox];
+      if (d >= 0 && d <= R) { o.fromShout = true; this.wake(o, 0.5 + Math.random() * 0.9); n++; }
+    }
+    if (n) { this.ctx.sfx && this.ctx.sfx('alert_' + e.type, e.x, e.z); this.ctx.onShout && this.ctx.onShout(e, n); }
+  }
+  // 包抄：選一個在玩家另一側的格子，先繞過去
+  maybeFlank(e) {
+    if (e.boss || e.type === 'dog' || e.type === 'heavy' || e.summoned || Math.random() > 0.35) return;
+    const f = this.field; if (!f) return;
+    const W = this.world.W, p = this.pp; if (!p) return;
+    const ea = Math.atan2(e.x - p.x, e.z - p.z), cand = [];
+    for (let i = 0; i < f.length; i++) {
+      const d = f[i]; if (d < 3 || d > 7) continue;
+      const cx = (i % W + 0.5) * CELL, cz = (((i / W) | 0) + 0.5) * CELL;
+      let da = Math.abs(Math.atan2(cx - p.x, cz - p.z) - ea); if (da > Math.PI) da = 2 * Math.PI - da;
+      if (da > 1.7) cand.push(i);
+    }
+    if (!cand.length) return;
+    const c = cand[Math.floor(Math.random() * cand.length)];
+    const ff = this.world.distField(c % W, (c / W) | 0, 120), [gx, gz] = e.cell, mine = ff[gz * W + gx];
+    if (mine < 0 || mine > (f[gz * W + gx] + 14)) return;
+    e.flankF = ff; e.flankT = 14;
   }
   // 射線檢查
   raycast(ox, oy, oz, dx, dy, dz, maxT) {
@@ -435,17 +481,18 @@ export class Enemies {
   }
   hurt(e, dmg, head = false, fromX, fromZ) {
     if (e.dead) return false;
-    if (head) dmg *= 2;
+    if (head) dmg *= 2.5;
     e.hp -= dmg; e.flashT = 0.09; e.setFlash(true);
     if (e.state === 'idle') { e.state = 'chase'; e.react = 0; }
     if (e.state === 'alert') { e.state = 'chase'; e.react = 0; }
     if (e.hp <= 0) { this.kill(e); return true; }
     this.ctx.sfx && this.ctx.sfx('hurt_' + e.type, e.x, e.z);
     if (Math.random() < e.T.pain && e.state !== 'pain') { e.state = 'pain'; e.stateTimer = 0.32; e.windT = 0; e.aimed = 0; }
+    else if (!e.boss && e.type !== 'dog' && e.type !== 'heavy' && e.state === 'chase' && Math.random() < 0.5) { e.strafeT = 0.45 + Math.random() * 0.3; e.strafeDir = Math.random() < 0.5 ? 1 : -1; e.dodge = true; }
     return false;
   }
   kill(e) {
-    e.dead = true; e.deadT = 0; e.state = 'dead'; e.setFlash(false);
+    e.dead = true; e.deadT = 0; e.state = 'dead'; e.setFlash(false); if (e.ring) e.ring.visible = false;
     e.fl.visible = false;
     this.ctx.sfx && this.ctx.sfx('die_' + e.type, e.x, e.z);
     this.ctx.onKill && this.ctx.onKill(e);
@@ -490,8 +537,8 @@ export class Enemies {
     let d = ang - e.face; d = Math.atan2(Math.sin(d), Math.cos(d));
     e.face += Math.max(-rate * dt, Math.min(rate * dt, d));
   }
-  follow(e, dt, speed) {
-    const W = this.world.W, [gx, gz] = e.cell, f = this.field;
+  follow(e, dt, speed, f0) {
+    const W = this.world.W, [gx, gz] = e.cell, f = f0 || this.field, occ = this.occ;
     let best = f[gz * W + gx], bx = -1, bz = -1;
     if (best < 0) best = 1e9;
     for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
@@ -500,7 +547,7 @@ export class Enemies {
       const d = f[nz * W + nx]; if (d < 0) continue;
       if (dx && dz && (f[gz * W + nx] < 0 || f[nz * W + gx] < 0)) continue;
       if (dx && dz && (this.world.rawSolid(nx, gz) || this.world.rawSolid(gx, nz))) continue;
-      const score = d + (dx && dz ? 0.4 : 0);
+      const score = d + (dx && dz ? 0.4 : 0) + (occ ? (occ.get(nz * W + nx) || 0) * 1.6 : 0);
       if (score < best) { best = score; bx = nx; bz = nz; }
     }
     if (bx < 0) return false;
@@ -521,7 +568,7 @@ export class Enemies {
     const pellets = T.pellets || 1;
     let hits = 0;
     for (let i = 0; i < pellets; i++) {
-      let chance = T.acc * Math.max(0.12, 1 - d / 24) * (p.moving ? 0.72 : 1) * (this.world.los(e.x, e.z, p.x, p.z) ? 1 : 0);
+      let chance = T.acc * Math.max(0.12, 1 - d / 24) * (p.moving ? 0.82 : 1) * (e.dm ? e.dm.acc : 1) * (this.world.los(e.x, e.z, p.x, p.z) ? 1 : 0);
       if (e.type === 'heavy') chance *= 0.9;
       if (Math.random() < chance) hits++;
     }
@@ -534,12 +581,15 @@ export class Enemies {
     this.pp = p;
     this.makeField(p.x, p.z);
     const W = this.world.W;
+    const occ = this.occ = new Map();
+    for (const e of this.list) if (!e.dead && e.state !== 'idle') { const [gx, gz] = e.cell, k = gz * W + gx; occ.set(k, (occ.get(k) || 0) + 1); }
     for (const e of this.list) {
       e.t += dt; e.sinceShot = (e.sinceShot ?? 9) + dt;
       if (e.flashT > 0) { e.flashT -= dt; if (e.flashT <= 0) e.setFlash(false); }
       if (e.flT > 0) { e.flT -= dt; if (e.flT <= 0) e.fl.visible = false; }
       if (e.dead) { e.deadT += dt; e.animate(dt, false); continue; }
       if (e.boss) this.bossPhase(e);
+      if (e.shoutT > 0) { e.shoutT -= dt; if (e.shoutT <= 0) this.shout(e); }
       const T = e.T, dx = p.x - e.x, dz = p.z - e.z, dist = Math.hypot(dx, dz);
       const los = p.alive && dist < 60 && this.world.los(e.x, e.z, p.x, p.z);
       const toP = Math.atan2(dx, dz);
@@ -555,7 +605,7 @@ export class Enemies {
         }
         case 'alert': {
           this.turnTo(e, toP, dt, 7);
-          e.react -= dt; if (e.react <= 0) { e.state = 'chase'; e.stateTimer = 0; }
+          e.react -= dt; if (e.react <= 0) { e.state = 'chase'; e.stateTimer = 0; this.maybeFlank(e); }
           break;
         }
         case 'pain': {
@@ -566,14 +616,30 @@ export class Enemies {
           if (!p.alive) { e.state = 'idle'; break; }
           e.cool -= dt;
           const inRange = los && dist < T.range;
+          if (e.flankF && los && dist < 10) e.flankF = null;
+          const canStrafe = !T.melee && !e.boss && e.type !== 'heavy';
+          if (e.strafeT > 0 && canStrafe) {
+            e.strafeT -= dt; const px = Math.cos(toP), pz = -Math.sin(toP);
+            const bx = e.x, bz = e.z;
+            moving = this.moveToward(e, e.x + px * e.strafeDir * 2, e.z + pz * e.strafeDir * 2, T.speed * (e.dodge ? 1.25 : 0.75), dt);
+            this.turnTo(e, toP, dt, 10);
+            if (Math.hypot(e.x - bx, e.z - bz) < T.speed * dt * 0.2) { e.strafeDir *= -1; }
+            if (e.strafeT <= 0) e.dodge = false;
+            if (!(inRange && e.cool <= 0)) break;
+            e.strafeT = 0; e.dodge = false;
+          }
           if (T.melee) {
             if (dist < 1.5 && los) { e.state = 'attack'; e.windT = 0; e.hitDone = false; break; }
             if (los) { this.turnTo(e, toP, dt, 12); moving = this.moveToward(e, p.x, p.z, T.speed, dt); }
             else moving = this.follow(e, dt, T.speed);
+          } else if (e.flankF) {
+            e.flankT -= dt; moving = this.follow(e, dt, T.speed * 1.1, e.flankF);
+            const [fx, fz] = e.cell; if (e.flankT <= 0 || e.flankF[fz * W + fx] <= 1) e.flankF = null;
           } else if (inRange && e.cool <= 0 && (dist > 3 || Math.random() < 0.5)) {
             e.state = 'attack'; e.windT = 0; e.aimed = 0; e.burstLeft = T.burst + (e.boss ? ((e.phase || 1) - 1) * 3 : 0); e.shotT = 0;
-          } else if (los && dist < T.range * 0.34 && dist > 3.5) {
-            // 保持距離、微調面向
+          } else if (canStrafe && inRange && dist > 3.5 && (dist < T.range * 0.34 || e.style < 0.6)) {
+            // 等待冷卻時左右移動，不站著當靶
+            e.strafeT = 0.6 + Math.random() * 0.8; if (Math.random() < 0.4) e.strafeDir *= -1;
             this.turnTo(e, toP, dt, 6);
           } else if (los && dist > 3) {
             this.turnTo(e, toP, dt, 5);
@@ -601,7 +667,7 @@ export class Enemies {
                 this.shoot(e, p); e.burstLeft--; e.shotT = e.type === 'boss' ? 0.09 : (T.burst > 1 ? 0.2 : 0.1);
               }
               if (e.burstLeft <= 0 && e.sinceShot > 0.25) {
-                e.state = 'chase'; e.cool = (T.cd[0] + Math.random() * (T.cd[1] - T.cd[0])) / rageOf(e);
+                e.state = 'chase'; e.cool = (T.cd[0] + Math.random() * (T.cd[1] - T.cd[0])) / rageOf(e) * (e.dm ? e.dm.cd : 1);
                 if (!los) e.cool *= 0.4;
               }
             }

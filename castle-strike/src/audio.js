@@ -348,6 +348,11 @@ export class AudioEngine {
       case 'alarm': { for (let i = 0; i < 4; i++) { sy.tone(t + i * 0.32, 520, 0.16, 0.2 * v, 'square', { filter: 1800, wet: 0.1 }); sy.tone(t + i * 0.32 + 0.16, 760, 0.16, 0.2 * v, 'square', { filter: 1800, wet: 0.1 }); } break; }
       case 'tick': sy.tone(t, 1400, 0.03, 0.16 * v, 'square', { wet: 0 }); break;
       case 'wave': [0, 1, 2].forEach((i) => sy.tone(t + i * 0.18, mtof(48 + [0, 0, 5][i]), 0.5, 0.3 * v, 'sawtooth', { filter: 700, wet: 0.3 })); break;
+      case 'wood_hit': { const g = sy.noise(t, 0.08, 0.3 * v, { type: 'bandpass', f0: 900, f1: 500, q: 2 }); sy.out(g, 0.05); sy.tone(t, 160, 0.06, 0.2 * v, 'triangle', { wet: 0 }); break; }
+      case 'wood_break': { const g = sy.noise(t, 0.45, 0.6 * v, { type: 'bandpass', f0: 1400, f1: 300, q: 0.9 }); sy.out(g, 0.15); [0, 0.04, 0.09, 0.15].forEach((d, i) => sy.tone(t + d, 140 + i * 35, 0.08, 0.22 * v, 'triangle', { wet: 0.1 })); sy.tom(t, 90, 0.3 * v); break; }
+      case 'pot_hit': sy.fm(t, mtof(84), 0.1, 0.12 * v, { ratio: 2.7, index: 2, decay: 0.08, wet: 0.2 }); break;
+      case 'pot_break': { const g = sy.noise(t, 0.35, 0.5 * v, { type: 'highpass', f0: 2200 }); sy.out(g, 0.2); [0, 0.03, 0.07, 0.12, 0.18].forEach((d, i) => sy.fm(t + d, mtof(88 + i * 3 - (i % 2) * 7), 0.15, 0.13 * v, { ratio: 3.1, index: 2.5, decay: 0.1, wet: 0.3 })); break; }
+      case 'gas': { const g = sy.noise(t, 1.6, 0.35 * v, { type: 'bandpass', f0: 2500, f1: 1200, q: 0.8 }); sy.out(g, 0.2); break; }
       case 'push': { const g = sy.noise(t, 1.4, 0.35 * v, { type: 'lowpass', f0: 400, f1: 100 }); sy.out(g, 0.3); sy.tone(t, 45, 1.4, 0.25 * v, 'sawtooth', { filter: 120, wet: 0.2 }); break; }
       case 'secret': [0, 1, 2, 3, 4].forEach((i) => sy.fm(t + i * 0.08, mtof(72 + [0, 4, 7, 12, 16][i]), 0.3, 0.14 * v, { ratio: 3.5, index: 1, decay: 0.2, wet: 0.4 })); break;
       case 'pickup': sy.fm(t, mtof(79), 0.1, 0.18 * v, { ratio: 2, index: 1.2, decay: 0.1, wet: 0.2 }); sy.fm(t + 0.07, mtof(86), 0.2, 0.18 * v, { ratio: 2, index: 1.2, decay: 0.15, wet: 0.3 }); break;

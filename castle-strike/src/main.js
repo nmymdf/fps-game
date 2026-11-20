@@ -12,6 +12,7 @@ import { flames } from './decor.js';
 import { sprites, getSet, setTexSize } from './textures.js';
 import { loadPhotos, spriteTex } from './photo.js';
 import { Traps } from './traps.js';
+import { Breakables } from './breakables.js';
 
 // ======================= 基本設定 =======================
 const SAVE = 'castleStrike.v1';
@@ -96,7 +97,7 @@ function disposeWorld() {
     scene.remove(G.world.group);
     G.world.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
   }
-  flames.length = 0; G.world = null; G.enemies = null; G.traps = null;
+  flames.length = 0; G.world = null; G.enemies = null; G.traps = null; G.breakables = null;
 }
 function enableShadows(root) {
   root.traverse((o) => { if (o.isMesh && o.material && !o.material.isMeshBasicMaterial && !o.userData.isOutline) { o.castShadow = true; o.receiveShadow = true; } });
@@ -114,6 +115,14 @@ function loadWorld(i) {
   G.traps = new Traps(G.lv, G.world, {
     P, enemies: () => G.enemies, hurtPlayer: (d, x, z) => damagePlayer(d, x, z),
     sfx: (n, x, z) => audio.sfx(n, x, z), fx: (x, y, z, k, n) => spawnFx(x, y, z, k, n),
+    noise: (x, z, r) => G.enemies && G.enemies.noise(x, z, r),
+  });
+  G.eliteWarned = false;
+  G.breakables = new Breakables(G.lv, G.world, {
+    P, sfx: (n, x, z) => audio.sfx(n, x, z), fx: (x, y, z, k, n) => spawnFx(x, y, z, k, n),
+    drop: (t, x, z, sub) => { const it = addItem(t, x, z, sub, true); it.bonus = true; return it; },
+    dog: (x, z) => { const e = G.enemies.spawn('dog', x, z); e.wave = false; e.summoned = true; enableShadows(e.group); e.blob.visible = false; },
+    hurtPlayer: (d, x, z) => damagePlayer(d, x, z), toast: (t, c) => toast(t, c),
     noise: (x, z, r) => G.enemies && G.enemies.noise(x, z, r),
   });
 }
@@ -298,7 +307,12 @@ const enemyCtx = {
   sfx: (n, x, z) => audio.sfx(n, x, z),
   hitPlayer: (dmg, fx, fz) => damagePlayer(dmg, fx, fz),
   onBossPhase: (ph) => { toast(ph === 2 ? '統領發怒了！援軍趕到！' : '統領瘋狂了！最後援軍！', 'bad'); audio.sfx('locked'); },
-  onWake: () => { if (G.lv && G.lv.cfg.mode === 'sneak') triggerAlarm(); },
+  onWake: (e) => {
+    if (G.lv && G.lv.cfg.mode === 'sneak') triggerAlarm();
+    if (e && e.elite && !G.eliteWarned) { G.eliteWarned = true; toast('精英兵出現！紅色光圈的敵人更耐打', 'bad'); }
+  },
+  onShout: (e, n) => { if (G.lv && G.lv.cfg.mode === 'sneak') return; const t = performance.now(); if (t - (G.shoutToastT || 0) > 12000) { G.shoutToastT = t; toast(`敵人呼叫支援！附近 ${n} 名敵人趕來`, 'bad'); } },
+  diffMul: () => ({ easy: { hp: 0.8, acc: 0.85, cd: 1.2 }, normal: { hp: 1, acc: 1, cd: 1 }, hard: { hp: 1.3, acc: 1.1, cd: 0.85 } })[settings.diff] || { hp: 1, acc: 1, cd: 1 },
   onKill: (e) => {
     if (!e.summoned) G.kills++; P.score += e.T.score;
     P.mood = 'grin'; P.moodT = 0.9;
@@ -308,6 +322,7 @@ const enemyCtx = {
     else if (e.type === 'officer') { dropAt('ammo', 20); if (Math.random() < 0.2) dropAt('armor', 0, 0.5, 0.3); }
     else if (e.type === 'heavy') { dropAt('shells', 8); if (Math.random() < 0.25) dropAt('medkit', 0, 0.5, 0.3); }
     else if (e.type === 'dog' && Math.random() < 0.15) dropAt('medkit');
+    if (e.elite) { const r = Math.random(); dropAt(r < 0.45 ? 'medkit' : r < 0.8 ? 'armor' : ['potion_speed', 'shield', 'power'][Math.floor(Math.random() * 3)], 0, -0.5, 0.4); }
     if (e.type === 'boss') { G.bossDead = true; G.winT = 3.5; toast('統領倒下了！', 'good'); }
   },
 };
@@ -373,7 +388,8 @@ function aimAssist() {
     if (d < bd) { bd = d; best = e; }
   }
   if (!best) return [0, 0];
-  const d = bd, ty = best.T.h * 0.62, pitch = Math.atan2(ty - eyeY(), d);
+  const yAim = eyeY() + Math.tan(P.pitch) * bd;
+  const d = bd, ty = best.type !== 'dog' && yAim > best.T.h * 0.74 ? best.T.h * 0.89 : best.T.h * 0.62, pitch = Math.atan2(ty - eyeY(), d);
   const ex = best.x - P.x, ez = best.z - P.z; const bearing = Math.atan2(ex, -ez);
   let dyaw = bearing - P.yaw; dyaw = Math.atan2(Math.sin(dyaw), Math.cos(dyaw));
   return [Math.abs(dyaw) < 0.06 ? dyaw : 0, pitch - P.pitch];
@@ -403,7 +419,9 @@ function fire() {
       const kill = G.enemies.hurt(r.hit.enemy, Math.round(dmg * falloff), r.hit.head);
       spawnFx(r.px, r.py, r.pz, 'blood', 3); hitAny = true; killedAny = killedAny || kill; headAny = headAny || !!r.hit.head;
     } else {
-      if (r.wall && G.traps && G.traps.shotAt(r.px, r.pz, (W.dmg[0] + W.dmg[1]) / 2 * dmgMul() * (P.cur === 'shotgun' ? 2.5 : 1))) hitAny = hitAny;
+      const bd = (W.dmg[0] + W.dmg[1]) / 2 * dmgMul();
+      if (r.wall && G.traps && G.traps.shotAt(r.px, r.pz, bd * (P.cur === 'shotgun' ? 2.5 : 1))) { /* 爆炸桶 */ }
+      else if (r.wall && G.breakables && G.breakables.shotAt(r.px, r.py, r.pz, bd)) { /* 雜物 */ }
       else { spawnFx(r.px, r.py, r.pz, 'spark', 3); spawnFx(r.px, r.py, r.pz, 'dust', 1); }
     }
   }
@@ -453,6 +471,7 @@ function meleeStrike() {
       G.enemies.hurt(en, Math.round((W.dmg[0] + Math.random() * (W.dmg[1] - W.dmg[0])) * dmgMul()), false); spawnFx(r.px, r.py, r.pz, 'blood', 4); hitSomething = true; break;
     }
   }
+  if (!hitSomething && G.breakables && G.breakables.meleeAt(P.x, P.z, Math.sin(P.yaw), -Math.cos(P.yaw), W.reach, 20)) hitSomething = true;
   if (hitSomething) { audio.sfx('knife_hit'); G.enemies.noise(P.x, P.z, 6); }
 }
 
@@ -470,7 +489,7 @@ function collect(it) {
     case 'armor': if (P.armor >= 100) return false; P.armor = Math.min(100, P.armor + 30); audio.sfx('pickup'); toast('護甲 +30', 'good'); break;
     case 'key_gold': P.keys.gold = true; audio.sfx('key'); toast('拿到金鑰匙！', 'good'); break;
     case 'key_silver': P.keys.silver = true; audio.sfx('key'); toast('拿到銀鑰匙！', 'good'); break;
-    case 'treasure': { const s = TREASURE_SCORE[it.sub] || 500; P.score += s; P.coins += s; G.treasure++; audio.sfx('treasure'); toast(`${TREASURE_NAME[it.sub] || '寶物'} +${s}`, 'good'); break; }
+    case 'treasure': { const s = TREASURE_SCORE[it.sub] || 500; P.score += s; P.coins += s; if (!it.bonus) G.treasure++; audio.sfx('treasure'); toast(`${TREASURE_NAME[it.sub] || '寶物'} +${s}`, 'good'); break; }
     default:
       if (it.type.startsWith('weapon_')) {
         const id = it.type.slice(7), W = WEAPONS[id];
@@ -900,7 +919,7 @@ function frame(now, dtOv) {
       if (P.meleeT > 0) { P.meleeT -= dt; if (P.meleeT <= 0) meleeStrike(); }
       if ((mouseDown) && (WEAPONS[P.cur].auto || !P.fireLatch)) { if (fire() && !WEAPONS[P.cur].auto) P.fireLatch = true; }
       if (!mouseDown) P.fireLatch = false;
-      updateItems(dt); updateHostage(dt); if (G.traps) G.traps.update(dt); updateBuffs(dt); updateMode(dt);
+      updateItems(dt); updateHostage(dt); if (G.traps) G.traps.update(dt); if (G.breakables) G.breakables.update(dt); updateBuffs(dt); updateMode(dt);
       updatePrompt();
       mapT -= dt; if (mapT <= 0) { mapT = 0.2; markSeen(); if (mapOn) drawMap(ui.mapc, false); }
       musicT -= dt;

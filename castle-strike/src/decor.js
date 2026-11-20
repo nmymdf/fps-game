@@ -91,6 +91,15 @@ export function buildDecor(type, theme, rnd) {
       const sh = mesh(geo('sshield', () => new THREE.BoxGeometry(0.06, 0.55, 0.4)), gold, -0.42, 1.2, 0.08); g.add(sh);
       break;
     }
+    case 'urn': {
+      const col = [0xb0623a, 0x6a7a8a, 0x8a5a9a, 0x3a6a5a][Math.floor(rnd() * 4)];
+      const pts = [[0.001, 0], [0.2, 0], [0.32, 0.12], [0.4, 0.38], [0.36, 0.62], [0.2, 0.8], [0.16, 0.9], [0.24, 1.0], [0.24, 1.04], [0.001, 1.04]].map(([r, y]) => new THREE.Vector2(r, y));
+      g.add(mesh(geo('urn', () => new THREE.LatheGeometry(pts, 18)), std('urn' + col, () => new THREE.MeshStandardMaterial({ color: col, roughness: 0.45, metalness: 0.05 }))));
+      const band = geo('urnband', () => new THREE.TorusGeometry(0.395, 0.025, 6, 22));
+      for (const y of [0.38, 0.6]) { const b = mesh(band, metal(0xd4a640, 0.3), 0, y, 0); b.rotation.x = Math.PI / 2; b.scale.setScalar(y > 0.5 ? 0.92 : 1); g.add(b); }
+      g.scale.setScalar(1.05);
+      break;
+    }
     case 'plant': {
       g.add(mesh(geo('pot', () => new THREE.CylinderGeometry(0.4, 0.28, 0.6, 14)), plain(0x9a5a3a, 0.85), 0, 0.3, 0));
       g.add(mesh(geo('soil', () => new THREE.CylinderGeometry(0.37, 0.37, 0.05, 14)), plain(0x2c1c12, 1), 0, 0.6, 0));
@@ -141,5 +150,5 @@ export function buildDecor(type, theme, rnd) {
 }
 
 export function decorRadius(type) {
-  return { pillar: 0.62, barrel: 0.66, crate: 0.7, table: 0.95, statue: 0.62, plant: 0.45, candelabra: 0.4, chandelier: 0 }[type] ?? 0.5;
+  return { pillar: 0.62, barrel: 0.66, crate: 0.7, table: 0.95, statue: 0.62, plant: 0.45, urn: 0.42, candelabra: 0.4, chandelier: 0 }[type] ?? 0.5;
 }
